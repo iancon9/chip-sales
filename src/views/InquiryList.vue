@@ -80,8 +80,8 @@ async function handleImportFile(e) {
     const colMap = {}
     headers.forEach(k => {
       const u = k.toUpperCase()
-      // MPN
-      if (!colMap.mpn && /MPN|PART|型号|P\/N/.test(u)) colMap.mpn = k
+      // MPN - match more column name patterns
+      if (!colMap.mpn && /MPN|PART\s*(NO|NUMBER|#)?$|型号|P\/N|产品型号|芯片型号|PART_NAME/i.test(u)) colMap.mpn = k
       // Brand
       if (!colMap.brand && /BRAND|品牌|MFG|MAKER|MANUFACTURE/.test(u)) colMap.brand = k
       // Currency
@@ -151,13 +151,20 @@ async function handleImportFile(e) {
       store.clearItemCostEntries(inquiry.id)
     }
 
+    console.log('有效行数:', validRows.length)
+    console.log('mpn列名:', colMap.mpn)
+    console.log('cost列名:', colMap.costPrice)
+    console.log('询价单型号:', pendingInquiries.flatMap(inq => inq.items.map(it => it.mpn)).filter(Boolean))
+
     let matchedCount = 0
     let skippedCount = 0
 
     for (const row of validRows) {
       const rawMpn = row[colMap.mpn]
+      console.log('采购行MPN原始值:', rawMpn, '类型:', typeof rawMpn)
       if (!rawMpn && rawMpn !== 0) { skippedCount++; continue }
       const purchaseMpn = String(rawMpn).trim().toUpperCase()
+      console.log('采购行MPN处理后:', purchaseMpn)
       if (!purchaseMpn) { skippedCount++; continue }
       const purchaseMpnClean = stripSuffixes(purchaseMpn)
 
@@ -171,6 +178,7 @@ async function handleImportFile(e) {
 
           const isMatch = (inquiryMpnClean === purchaseMpnClean) || (inquiryMpn === purchaseMpn)
           if (isMatch) {
+            console.log('✓ 匹配成功:', inquiryMpn, '↔', purchaseMpn)
             const entry = {}
             if (colMap.costPrice && row[colMap.costPrice] !== undefined && row[colMap.costPrice] !== '') entry.costPrice = String(row[colMap.costPrice])
             if (colMap.currency && row[colMap.currency]) entry.costCurrency = String(row[colMap.currency])
@@ -189,7 +197,10 @@ async function handleImportFile(e) {
           }
         }
       }
-      if (!matchedAny) skippedCount++
+      if (!matchedAny) {
+        console.log('✗ 未匹配:', purchaseMpn)
+        skippedCount++
+      }
     }
 
     // Step 4: For each inquiry item with costEntries, auto-select lowest cost price

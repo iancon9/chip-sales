@@ -147,6 +147,11 @@ async function handleImportFile(e) {
 
     // Step 3: Clear ALL previous cost entries & cost fields before importing
     const pendingInquiries = store.inquiries.filter(i => i.status === 'pending')
+    if (pendingInquiries.length === 0) {
+      ElMessage.warning('没有待处理的询价单，请先创建询价单')
+      fileInput.value.value = ''
+      return
+    }
     for (const inquiry of pendingInquiries) {
       store.clearItemCostEntries(inquiry.id)
     }
@@ -176,7 +181,13 @@ async function handleImportFile(e) {
           const inquiryMpn = item.mpn.toUpperCase().trim()
           const inquiryMpnClean = stripSuffixes(inquiryMpn)
 
-          const isMatch = (inquiryMpnClean === purchaseMpnClean) || (inquiryMpn === purchaseMpn)
+          // Match by cleaned MPN, OR original full MPN, OR one contains the other
+          const isMatch = (
+            inquiryMpnClean === purchaseMpnClean ||
+            inquiryMpn === purchaseMpn ||
+            inquiryMpn.includes(purchaseMpn) ||
+            purchaseMpn.includes(inquiryMpn)
+          )
           if (isMatch) {
             console.log('✓ 匹配成功:', inquiryMpn, '↔', purchaseMpn)
             const entry = {}

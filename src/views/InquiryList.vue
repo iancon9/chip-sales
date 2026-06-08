@@ -120,13 +120,29 @@ async function handleImportFile(e) {
     function stripSuffixes(mpn) {
       if (!mpn) return ''
       let cleaned = mpn
-      for (const suffix of mpnSuffixes) {
-        if (cleaned.endsWith(suffix) && cleaned.length > suffix.length) {
-          cleaned = cleaned.slice(0, cleaned.length - suffix.length).trim()
-          break
+      let changed = true
+      while (changed) {
+        changed = false
+        for (const suffix of mpnSuffixes) {
+          if (suffix.length === 0) continue
+          // Check exact match or with delimiter prefix (space, dash, slash)
+          if (cleaned.endsWith(suffix) && cleaned.length > suffix.length) {
+            cleaned = cleaned.slice(0, cleaned.length - suffix.length)
+            changed = true
+          } else if (cleaned.endsWith('-' + suffix) && cleaned.length > suffix.length + 1) {
+            cleaned = cleaned.slice(0, cleaned.length - suffix.length - 1)
+            changed = true
+          } else if (cleaned.endsWith('/' + suffix) && cleaned.length > suffix.length + 1) {
+            cleaned = cleaned.slice(0, cleaned.length - suffix.length - 1)
+            changed = true
+          } else if (cleaned.endsWith(' ' + suffix) && cleaned.length > suffix.length + 1) {
+            cleaned = cleaned.slice(0, cleaned.length - suffix.length - 1)
+            changed = true
+          }
         }
       }
-      return cleaned
+      // Trim trailing non-alphanumeric characters (lingering dashes, dots, etc.)
+      return cleaned.replace(/[^A-Za-z0-9]+$/, '')
     }
 
     // Step 3: Clear ALL previous cost entries & cost fields before importing
@@ -153,7 +169,8 @@ async function handleImportFile(e) {
           const inquiryMpn = item.mpn.toUpperCase().trim()
           const inquiryMpnClean = stripSuffixes(inquiryMpn)
 
-          if (inquiryMpnClean === purchaseMpnClean) {
+          const isMatch = (inquiryMpnClean === purchaseMpnClean) || (inquiryMpn === purchaseMpn)
+          if (isMatch) {
             const entry = {}
             if (colMap.costPrice && row[colMap.costPrice] !== undefined && row[colMap.costPrice] !== '') entry.costPrice = String(row[colMap.costPrice])
             if (colMap.currency && row[colMap.currency]) entry.costCurrency = String(row[colMap.currency])

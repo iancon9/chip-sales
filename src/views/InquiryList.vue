@@ -135,14 +135,20 @@ async function handleImportFile(e) {
       return cleaned.replace(/[^A-Za-z0-9]+$/, '')
     }
 
-    // Clear all previous cost data
-    const targetInquiries = store.inquiries
-    if (targetInquiries.length === 0) {
-      ElMessage.warning('没有询价单可匹配，请先创建')
+    // 只匹配状态为「待处理」的询价单
+    const pendingInquiries = store.inquiries.filter(i => i.status === 'pending')
+    const quotedInquiries = store.inquiries.filter(i => i.status === 'quoted')
+
+    if (pendingInquiries.length === 0) {
+      if (store.inquiries.length === 0) {
+        ElMessage.warning('没有任何询价单，请先创建')
+      } else {
+        ElMessage.warning(`没有待处理的询价单（当前 ${store.inquiries.length} 个询价单中，${quotedInquiries.length} 个已报价。请新建询价单后再导入）`)
+      }
       fileInput.value.value = ''
       return
     }
-    for (const inquiry of targetInquiries) {
+    for (const inquiry of pendingInquiries) {
       store.clearItemCostEntries(inquiry.id)
     }
 
@@ -157,7 +163,7 @@ async function handleImportFile(e) {
       const purchaseMpnClean = stripSuffixes(purchaseMpn)
 
       let matchedAny = false
-      for (const inquiry of targetInquiries) {
+      for (const inquiry of pendingInquiries) {
         for (let i = 0; i < inquiry.items.length; i++) {
           const item = inquiry.items[i]
           if (!item.mpn) continue
@@ -197,7 +203,7 @@ async function handleImportFile(e) {
 
     // Auto-select lowest cost price
     let autoAppliedCount = 0
-    for (const inquiry of targetInquiries) {
+    for (const inquiry of pendingInquiries) {
       for (let i = 0; i < inquiry.items.length; i++) {
         const item = inquiry.items[i]
         if (item.costEntries && item.costEntries.length > 0) {

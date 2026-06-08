@@ -32,7 +32,7 @@
         </div>
       </div>
 
-      <el-table :data="displayItems" size="small" style="width:100%" :row-key="(item) => item._rowId" :expand-row-keys="expandedRows" @expand-change="handleExpandChange">
+      <el-table :data="displayItems" size="small" style="width:100%" :row-key="(item) => item._rowId">
         <el-table-column type="expand">
           <template #default="{ row: itemRow }">
             <div v-if="itemRow.costEntries && itemRow.costEntries.length > 0" style="padding:8px 16px">
@@ -101,7 +101,6 @@ watch(inquiry, (inq) => {
 }, { immediate: true })
 
 const showMatchedOnly = ref(false)
-const expandedRows = ref([])
 
 const displayItems = computed(() => {
   if (!inquiry.value) return []
@@ -110,10 +109,6 @@ const displayItems = computed(() => {
   }
   return inquiry.value.items
 })
-
-function handleExpandChange(row, expandedRowsList) {
-  expandedRows.value = [row]
-}
 
 function formatNum(n) { return n ? Number(n).toLocaleString() : '-' }
 

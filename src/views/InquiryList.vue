@@ -129,10 +129,22 @@ async function handleImportFile(e) {
       return cleaned
     }
 
-    // Step 3: Match same chip by prefix after stripping suffixes
+    // Step 3: Clear previous cost entries & cost fields before importing
+    const pendingInquiries = store.inquiries.filter(i => i.status === 'pending')
+    for (const inquiry of pendingInquiries) {
+      for (let i = 0; i < inquiry.items.length; i++) {
+        const item = inquiry.items[i]
+        item.costEntries = []
+        item.costPrice = ''
+        item.costQuantity = ''
+        item.costBatch = ''
+        item.costSupplier = ''
+        item.costDeliveryDate = ''
+      }
+    }
+
     let matchedCount = 0
     let skippedCount = 0
-    const pendingInquiries = store.inquiries.filter(i => i.status === 'pending')
 
     for (const row of validRows) {
       const rawMpn = row[colMap.mpn]

@@ -31,22 +31,22 @@
         </div>
       </div>
 
-      <el-table :data="inquiry.items" size="small" style="width:100%" row-key="id">
+      <el-table :data="inquiry.items" size="small" style="width:100%" :row-key="(item, idx) => idx">
         <el-table-column type="expand">
-          <template #default="{ row }">
-            <div v-if="row.costEntries && row.costEntries.length > 0" style="padding:8px 16px">
-              <div class="text-sm text-muted mb-8">来自采购报价表的匹配结果（{{ row.costEntries.length }} 条）：</div>
-              <el-table :data="row.costEntries" size="small" border style="width:100%">
-                <el-table-column label="型号 MPN" min-width="150"><template #default="{ r }">{{ r.mpn || row.mpn }}</template></el-table-column>
-                <el-table-column label="采购数量" width="100" align="right"><template #default="{ r }">{{ formatNum(r.costQuantity) }}</template></el-table-column>
-                <el-table-column label="采购单价" width="100" align="right"><template #default="{ r }">{{ r.costPrice ? '$' + r.costPrice : '-' }}</template></el-table-column>
-                <el-table-column label="币种" width="80"><template #default="{ r }">{{ r.costCurrency || 'USD' }}</template></el-table-column>
-                <el-table-column label="采购批次" width="100"><template #default="{ r }">{{ r.costBatch || '-' }}</template></el-table-column>
-                <el-table-column label="采购员" width="100"><template #default="{ r }">{{ r.costSupplier || '-' }}</template></el-table-column>
-                <el-table-column label="交期" width="100"><template #default="{ r }">{{ r.costDeliveryDate || '-' }}</template></el-table-column>
+          <template #default="{ row: itemRow }">
+            <div v-if="itemRow.costEntries && itemRow.costEntries.length > 0" style="padding:8px 16px">
+              <div class="text-sm text-muted mb-8">来自采购报价表的匹配结果（{{ itemRow.costEntries.length }} 条）：</div>
+              <el-table :data="itemRow.costEntries" size="small" border style="width:100%">
+                <el-table-column label="型号 MPN" min-width="150"><template #default="{ row: entry }">{{ entry.mpn || itemRow.mpn }}</template></el-table-column>
+                <el-table-column label="采购数量" width="100" align="right"><template #default="{ row: entry }">{{ formatNum(entry.costQuantity) }}</template></el-table-column>
+                <el-table-column label="采购单价" width="100" align="right"><template #default="{ row: entry }">{{ entry.costPrice ? '$' + entry.costPrice : '-' }}</template></el-table-column>
+                <el-table-column label="币种" width="80"><template #default="{ row: entry }">{{ entry.costCurrency || 'USD' }}</template></el-table-column>
+                <el-table-column label="采购批次" width="100"><template #default="{ row: entry }">{{ entry.costBatch || '-' }}</template></el-table-column>
+                <el-table-column label="采购员" width="100"><template #default="{ row: entry }">{{ entry.costSupplier || '-' }}</template></el-table-column>
+                <el-table-column label="交期" width="100"><template #default="{ row: entry }">{{ entry.costDeliveryDate || '-' }}</template></el-table-column>
                 <el-table-column label="操作" width="80">
-                  <template #default="{ $index }">
-                    <el-button size="small" type="primary" @click="applyCostEntry(row, row.costEntries[$index])">应用</el-button>
+                  <template #default="{ $index: entryIdx }">
+                    <el-button size="small" type="primary" @click="applyCostEntry(itemRow, entryIdx)">应用</el-button>
                   </template>
                 </el-table-column>
               </el-table>
@@ -91,17 +91,19 @@ const selectedCount = computed(() => inquiry.value ? inquiry.value.items.filter(
 
 function formatNum(n) { return n ? Number(n).toLocaleString() : '-' }
 
-function applyCostEntry(item, entry) {
+function applyCostEntry(itemRow, entryIdx) {
   if (!inquiry.value) return
-  const idx = inquiry.value.items.indexOf(item)
+  const entry = itemRow.costEntries[entryIdx]
+  if (!entry) return
+  const idx = inquiry.value.items.indexOf(itemRow)
   if (idx === -1) return
   store.updateItemCost(inquiry.value.id, idx, {
-    costPrice: entry.costPrice || item.costPrice,
-    costQuantity: entry.costQuantity || item.costQuantity,
-    costCurrency: entry.costCurrency || item.costCurrency || 'USD',
-    costBatch: entry.costBatch || item.costBatch,
-    costSupplier: entry.costSupplier || item.costSupplier,
-    costDeliveryDate: entry.costDeliveryDate || item.costDeliveryDate
+    costPrice: entry.costPrice || itemRow.costPrice,
+    costQuantity: entry.costQuantity || itemRow.costQuantity,
+    costCurrency: entry.costCurrency || itemRow.costCurrency || 'USD',
+    costBatch: entry.costBatch || itemRow.costBatch,
+    costSupplier: entry.costSupplier || itemRow.costSupplier,
+    costDeliveryDate: entry.costDeliveryDate || itemRow.costDeliveryDate
   })
   ElMessage.success('已应用该条采购报价到当前行')
 }

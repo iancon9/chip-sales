@@ -26,12 +26,13 @@
       <div class="flex-between mb-16">
         <h4>芯片明细 · 成本录入</h4>
         <div>
+          <el-button size="small" style="margin-right:6px" :type="showMatchedOnly ? 'primary' : ''" @click="showMatchedOnly = !showMatchedOnly">{{ showMatchedOnly ? '显示全部' : '仅看已匹配' }} ({{ inquiry.items.filter(it => it.costEntries && it.costEntries.length > 0).length }})</el-button>
           <el-button size="small" @click="store.selectAllItems(inquiry.id, true)">全选</el-button>
           <el-button size="small" @click="store.selectAllItems(inquiry.id, false)">取消全选</el-button>
         </div>
       </div>
 
-      <el-table :data="inquiry.items" size="small" style="width:100%" :row-key="(item, idx) => idx">
+      <el-table :data="displayItems" size="small" style="width:100%" :row-key="(item) => item._rowId" :expand-row-keys="expandedRows" @expand-change="handleExpandChange">
         <el-table-column type="expand">
           <template #default="{ row: itemRow }">
             <div v-if="itemRow.costEntries && itemRow.costEntries.length > 0" style="padding:8px 16px">
@@ -64,6 +65,7 @@
         <el-table-column label="采购单价" width="100"><template #default="{ $index }"><el-input v-model="inquiry.items[$index].costPrice" size="small" type="number" step="0.01" placeholder="单价" /></template></el-table-column>
         <el-table-column label="采购数量" width="90"><template #default="{ $index }"><el-input v-model="inquiry.items[$index].costQuantity" size="small" placeholder="数量" /></template></el-table-column>
         <el-table-column label="币种" width="70"><template #default="{ $index }"><el-select v-model="inquiry.items[$index].costCurrency" size="small" style="width:100%"><el-option label="USD" value="USD" /><el-option label="RMB" value="RMB" /></el-select></template></el-table-column>
+        <el-table-column label="交期" width="100"><template #default="{ $index }"><el-input v-model="inquiry.items[$index].costDeliveryDate" size="small" placeholder="如 7days" /></template></el-table-column>
         <el-table-column label="批次" width="100"><template #default="{ $index }"><el-input v-model="inquiry.items[$index].costBatch" size="small" placeholder="如 24+" /></template></el-table-column>
         <el-table-column label="操作" width="80"><template #default="{ $index }"><el-button size="small" type="primary" @click="saveCost($index)">保存</el-button></template></el-table-column>
       </el-table>
@@ -72,7 +74,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useInquiryStore } from '../stores/inquiry'
 import { useCustomerStore } from '../stores/customer'
@@ -88,6 +90,30 @@ const quoteStore = useQuoteStore()
 
 const inquiry = computed(() => store.getInquiry(route.params.id))
 const selectedCount = computed(() => inquiry.value ? inquiry.value.items.filter(it => it.selected).length : 0)
+
+// Assign unique _rowId to each item for row-key
+watch(inquiry, (inq) => {
+  if (inq && inq.items) {
+    inq.items.forEach((item, idx) => {
+      if (!item._rowId) item._rowId = 'item-' + idx + '-' + Date.now()
+    })
+  }
+}, { immediate: true })
+
+const showMatchedOnly = ref(false)
+const expandedRows = ref([])
+
+const displayItems = computed(() => {
+  if (!inquiry.value) return []
+  if (showMatchedOnly.value) {
+    return inquiry.value.items.filter(it => it.costEntries && it.costEntries.length > 0)
+  }
+  return inquiry.value.items
+})
+
+function handleExpandChange(row, expandedRowsList) {
+  expandedRows.value = [row]
+}
 
 function formatNum(n) { return n ? Number(n).toLocaleString() : '-' }
 

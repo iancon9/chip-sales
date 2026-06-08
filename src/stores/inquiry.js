@@ -67,6 +67,22 @@ function generateId() { return 'INQ-' + Date.now().toString(36).toUpperCase() }
     }
   }
 
+  function clearItemCostEntries(inquiryId) {
+    const inquiry = inquiries.value.find(i => i.id === inquiryId)
+    if (!inquiry) return
+    inquiry.items.forEach(item => {
+      item.costEntries = []
+      item.costPrice = ''
+      item.costQuantity = ''
+      item.costCurrency = ''
+      item.costBatch = ''
+      item.costSupplier = ''
+      item.costDeliveryDate = ''
+    })
+    inquiry.updatedAt = new Date().toISOString()
+    save(inquiries.value)
+  }
+
   function addItemCostEntry(inquiryId, itemIndex, entry) {
     const inquiry = inquiries.value.find(i => i.id === inquiryId)
     if (inquiry && inquiry.items[itemIndex]) {
@@ -104,5 +120,5 @@ function generateId() { return 'INQ-' + Date.now().toString(36).toUpperCase() }
 
   const pendingCount = computed(() => inquiries.value.filter(i => i.status === 'pending').length)
 
-  return { inquiries, statusLabels, createInquiry, updateInquiry, updateItemCost, addItemCostEntry, toggleItemSelect, selectAllItems, deleteInquiry, getInquiry, pendingCount }
+  return { inquiries, statusLabels, createInquiry, updateInquiry, updateItemCost, clearItemCostEntries, addItemCostEntry, toggleItemSelect, selectAllItems, deleteInquiry, getInquiry, pendingCount }
 })

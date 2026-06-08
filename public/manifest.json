@@ -1,0 +1,10 @@
+{
+  "name": "ChipSales - 芯片销售辅助系统",
+  "short_name": "ChipSales",
+  "description": "芯片询价报价一体化工具",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#fafafa",
+  "theme_color": "#1a1a1a",
+  "icons": []
+}

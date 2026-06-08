@@ -1,0 +1,326 @@
+/* === 极简风格全局样式 === */
+:root {
+  --color-bg: #fafafa;
+  --color-surface: #ffffff;
+  --color-border: #e8e8e8;
+  --color-text: #1a1a1a;
+  --color-text-secondary: #888888;
+  --color-primary: #1a1a1a;
+  --color-accent: #555555;
+  --color-high-value: #ebf8eb;
+  --color-high-value-text: #2d7d2d;
+  --color-none-value: #f5f5f5;
+  --radius: 4px;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+/* Layout */
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.app-sidebar {
+  width: 200px;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  padding: 20px 0;
+  flex-shrink: 0;
+}
+
+.app-sidebar .logo {
+  font-size: 16px;
+  font-weight: 600;
+  padding: 0 20px 20px;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 12px;
+  letter-spacing: 0.5px;
+}
+
+.app-sidebar .nav-item {
+  padding: 10px 20px;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-left: 2px solid transparent;
+}
+
+.app-sidebar .nav-item:hover {
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+.app-sidebar .nav-item.active {
+  color: var(--color-primary);
+  font-weight: 500;
+  border-left-color: var(--color-primary);
+  background: var(--color-bg);
+}
+
+.app-main {
+  flex: 1;
+  padding: 28px 32px;
+  overflow-y: auto;
+}
+
+/* Page header */
+.page-header {
+  margin-bottom: 24px;
+}
+
+.page-header h2 {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+}
+
+.page-header p {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+/* Card */
+.card-minimal {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+/* Row high-value */
+.row-high-value {
+  background: var(--color-high-value) !important;
+}
+
+.row-high-value td {
+  color: var(--color-high-value-text) !important;
+}
+
+.row-none-value {
+  opacity: 0.4;
+}
+
+/* Utility */
+.text-muted {
+  color: var(--color-text-secondary);
+}
+
+.text-sm {
+  font-size: 12px;
+}
+
+.mb-16 {
+  margin-bottom: 16px;
+}
+
+.mb-8 {
+  margin-bottom: 8px;
+}
+
+.mt-16 {
+  margin-top: 16px;
+}
+
+.flex-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Element Plus overrides for minimal look */
+.el-button--primary {
+  --el-button-bg-color: #1a1a1a;
+  --el-button-border-color: #1a1a1a;
+  --el-button-hover-bg-color: #333;
+  --el-button-hover-border-color: #333;
+}
+
+.el-table {
+  --el-table-border-color: var(--color-border);
+  --el-table-header-bg-color: #fafafa;
+  font-size: 13px;
+}
+
+.el-table th.el-table__cell {
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.el-menu {
+  border-right: none !important;
+}
+
+.el-tag {
+  border-radius: 2px;
+  font-size: 11px;
+}
+
+/* Status tags */
+.status-pending {
+  --el-tag-bg-color: #f5f5f5;
+  --el-tag-border-color: #e0e0e0;
+  --el-tag-text-color: #888;
+}
+
+.status-annotated {
+  --el-tag-bg-color: #e8f4fd;
+  --el-tag-border-color: #b3d8f5;
+  --el-tag-text-color: #3d8fd9;
+}
+
+.status-exported {
+  --el-tag-bg-color: #fef3e5;
+  --el-tag-border-color: #fad4a7;
+  --el-tag-text-color: #c98a3e;
+}
+
+.status-quoted {
+  --el-tag-bg-color: #ebf8eb;
+  --el-tag-border-color: #b3e0b3;
+  --el-tag-text-color: #2d7d2d;
+}
+
+.status-closed {
+  --el-tag-bg-color: #f0f0f0;
+  --el-tag-border-color: #d0d0d0;
+  --el-tag-text-color: #666;
+}
+
+/* Upload area */
+.eml-upload {
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+  padding: 32px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.eml-upload:hover {
+  border-color: var(--color-text-secondary);
+}
+
+/* Profit cards */
+.profit-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 16px;
+  background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+}
+
+.profit-card .label {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.profit-card .value {
+  font-size: 20px;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+/* Commission section (inside profit-card) */
+.commission-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-height: 120px;
+}
+
+.commission-label {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.commission-month {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  margin-left: 4px;
+  opacity: 0.7;
+}
+
+.commission-value {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.commission-desc {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+.commission-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.commission-hint {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+/* Data management buttons - equal width */
+.data-mgmt-row .el-col {
+  display: flex;
+}
+
+.data-mgmt-btn,
+.data-mgmt-upload .el-button {
+  width: 100%;
+  height: 40px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* Ensure el-upload and its inner wrappers stretch to fill the column */
+.data-mgmt-upload,
+.data-mgmt-upload .el-upload,
+.data-mgmt-upload .el-upload__inner {
+  width: 100%;
+  display: block;
+}
+
+.data-mgmt-btn--danger {
+  --el-button-bg-color: #f56c6c;
+  --el-button-border-color: #f56c6c;
+  --el-button-hover-bg-color: #f78989;
+  --el-button-hover-border-color: #f78989;
+}

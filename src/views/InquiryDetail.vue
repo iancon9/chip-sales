@@ -56,25 +56,27 @@
           </template>
         </el-table-column>
         <el-table-column label="选择" width="55" align="center">
-          <template #default="{ $index }"><el-checkbox :model-value="inquiry.items[$index].selected" @change="store.toggleItemSelect(inquiry.id, $index)" /></template>
+          <template #default="{ row }">
+            <el-checkbox :model-value="row.selected" @change="store.toggleItemSelect(inquiry.id, findItemIndex(row))" />
+          </template>
         </el-table-column>
         <el-table-column label="品牌" min-width="110"><template #default="{ row }">{{ row.brand }}</template></el-table-column>
         <el-table-column label="型号 MPN" min-width="150"><template #default="{ row }"><strong>{{ row.mpn }}</strong></template></el-table-column>
         <el-table-column label="客户数量" width="90" align="right"><template #default="{ row }">{{ formatNum(row.quantity) }}</template></el-table-column>
         <el-table-column label="目标价" width="90"><template #default="{ row }">{{ row.targetPrice ? '$' + row.targetPrice : '-' }}</template></el-table-column>
-        <el-table-column label="采购单价" width="100"><template #default="{ $index }"><el-input v-model="inquiry.items[$index].costPrice" size="small" type="number" step="0.01" placeholder="单价" /></template></el-table-column>
-        <el-table-column label="采购数量" width="90"><template #default="{ $index }"><el-input v-model="inquiry.items[$index].costQuantity" size="small" placeholder="数量" /></template></el-table-column>
-        <el-table-column label="币种" width="70"><template #default="{ $index }"><el-select v-model="inquiry.items[$index].costCurrency" size="small" style="width:100%"><el-option label="USD" value="USD" /><el-option label="RMB" value="RMB" /></el-select></template></el-table-column>
-        <el-table-column label="交期" width="100"><template #default="{ $index }"><el-input v-model="inquiry.items[$index].costDeliveryDate" size="small" placeholder="如 7days" /></template></el-table-column>
-        <el-table-column label="批次" width="100"><template #default="{ $index }"><el-input v-model="inquiry.items[$index].costBatch" size="small" placeholder="如 24+" /></template></el-table-column>
-        <el-table-column label="操作" width="80"><template #default="{ $index }"><el-button size="small" type="primary" @click="saveCost($index)">保存</el-button></template></el-table-column>
+        <el-table-column label="采购单价" width="100"><template #default="{ row }"><el-input v-model="row.costPrice" size="small" type="number" step="0.01" placeholder="单价" /></template></el-table-column>
+        <el-table-column label="采购数量" width="90"><template #default="{ row }"><el-input v-model="row.costQuantity" size="small" placeholder="数量" /></template></el-table-column>
+        <el-table-column label="币种" width="70"><template #default="{ row }"><el-select v-model="row.costCurrency" size="small" style="width:100%"><el-option label="USD" value="USD" /><el-option label="RMB" value="RMB" /></el-select></template></el-table-column>
+        <el-table-column label="交期" width="100"><template #default="{ row }"><el-input v-model="row.costDeliveryDate" size="small" placeholder="如 7days" /></template></el-table-column>
+        <el-table-column label="批次" width="100"><template #default="{ row }"><el-input v-model="row.costBatch" size="small" placeholder="如 24+" /></template></el-table-column>
+        <el-table-column label="操作" width="80"><template #default="{ row }"><el-button size="small" type="primary" @click="saveCostForRow(row)">保存</el-button></template></el-table-column>
       </el-table>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, ref, watch, nextTick } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useInquiryStore } from '../stores/inquiry'
 import { useCustomerStore } from '../stores/customer'
@@ -110,6 +112,11 @@ const displayItems = computed(() => {
   return inquiry.value.items
 })
 
+function findItemIndex(row) {
+  if (!inquiry.value) return -1
+  return inquiry.value.items.indexOf(row)
+}
+
 function formatNum(n) { return n ? Number(n).toLocaleString() : '-' }
 
 function applyCostEntry(itemRow, entryIdx) {
@@ -127,6 +134,12 @@ function applyCostEntry(itemRow, entryIdx) {
     costDeliveryDate: entry.costDeliveryDate || itemRow.costDeliveryDate
   })
   ElMessage.success('已应用该条采购报价到当前行')
+}
+
+function saveCostForRow(row) {
+  const index = findItemIndex(row)
+  if (index === -1) return
+  saveCost(index)
 }
 
 function saveCost(index) {

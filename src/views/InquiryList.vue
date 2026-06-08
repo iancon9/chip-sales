@@ -73,34 +73,31 @@ async function handleImportFile(e) {
     const data = await file.arrayBuffer(); const wb = XLSX.read(data); const ws = wb.Sheets[wb.SheetNames[0]]; const rows = XLSX.utils.sheet_to_json(ws, { defval: '' })
     if (rows.length === 0) { ElMessage.warning('导入文件为空'); return }
 
-    // Log headers for debugging
     const headers = Object.keys(rows[0])
     console.log('导入文件列名:', headers)
 
     const colMap = {}
     headers.forEach(k => {
       const u = k.toUpperCase()
-      // MPN - match more column name patterns
       if (!colMap.mpn && /MPN|PART\s*(NO|NUMBER|#)?$|型号|P\/N|产品型号|芯片型号|PART_NAME/i.test(u)) colMap.mpn = k
-      // Brand
       if (!colMap.brand && /BRAND|品牌|MFG|MAKER|MANUFACTURE/.test(u)) colMap.brand = k
-      // Currency
       if (!colMap.currency && /币种|货币|CURRENCY/.test(u)) colMap.currency = k
-      // Cost price - use dedicated function
       if (!colMap.costPrice && looksLikeCostPrice(k)) colMap.costPrice = k
-      // Supplier / Buyer
       if (!colMap.supplier && /采购员|采购|SUPPLIER|BUYER/i.test(k)) colMap.supplier = k
-      // Delivery date
       if (!colMap.deliveryDate && looksLikeDeliveryDate(k)) colMap.deliveryDate = k
-      // Batch
       if (!colMap.batch && /批次|DC|DATE\s*CODE/i.test(u)) colMap.batch = k
-      // Quantity
       if (!colMap.quantity && /QTY|数量|QUANTITY/i.test(u)) colMap.quantity = k
     })
 
     console.log('列映射:', colMap)
 
-    // Step 1: Filter rows with non-empty cost price
+    if (!colMap.mpn) {
+      ElMessage.warning('未识别到型号列，请确认Excel中有"型号"或"MPN"列')
+      fileInput.value.value = ''
+      return
+    }
+
+    // Filter rows with non-empty cost price
     const validRows = rows.filter(row => {
       if (!colMap.costPrice) return false
       const cp = row[colMap.costPrice]
@@ -112,7 +109,6 @@ async function handleImportFile(e) {
       return
     }
 
-    // Step 2: Load MPN suffix ignore list from settings
     const MPN_SUFFIX_KEY = 'chip_sales_mpn_suffixes'
     const suffixStr = localStorage.getItem(MPN_SUFFIX_KEY) || 'TR, T/R, PBF, T&R'
     const mpnSuffixes = suffixStr.split(',').map(s => s.trim().toUpperCase()).filter(Boolean)
@@ -125,63 +121,49 @@ async function handleImportFile(e) {
         changed = false
         for (const suffix of mpnSuffixes) {
           if (suffix.length === 0) continue
-          // Check exact match or with delimiter prefix (space, dash, slash)
           if (cleaned.endsWith(suffix) && cleaned.length > suffix.length) {
-            cleaned = cleaned.slice(0, cleaned.length - suffix.length)
-            changed = true
+            cleaned = cleaned.slice(0, cleaned.length - suffix.length); changed = true
           } else if (cleaned.endsWith('-' + suffix) && cleaned.length > suffix.length + 1) {
-            cleaned = cleaned.slice(0, cleaned.length - suffix.length - 1)
-            changed = true
+            cleaned = cleaned.slice(0, cleaned.length - suffix.length - 1); changed = true
           } else if (cleaned.endsWith('/' + suffix) && cleaned.length > suffix.length + 1) {
-            cleaned = cleaned.slice(0, cleaned.length - suffix.length - 1)
-            changed = true
+            cleaned = cleaned.slice(0, cleaned.length - suffix.length - 1); changed = true
           } else if (cleaned.endsWith(' ' + suffix) && cleaned.length > suffix.length + 1) {
-            cleaned = cleaned.slice(0, cleaned.length - suffix.length - 1)
-            changed = true
+            cleaned = cleaned.slice(0, cleaned.length - suffix.length - 1); changed = true
           }
         }
       }
-      // Trim trailing non-alphanumeric characters (lingering dashes, dots, etc.)
       return cleaned.replace(/[^A-Za-z0-9]+$/, '')
     }
 
-    // Step 3: Clear ALL previous cost entries & cost fields before importing
-    const pendingInquiries = store.inquiries.filter(i => i.status === 'pending')
-    if (pendingInquiries.length === 0) {
-      ElMessage.warning('没有待处理的询价单，请先创建询价单')
+    // Clear all previous cost data
+    const targetInquiries = store.inquiries
+    if (targetInquiries.length === 0) {
+      ElMessage.warning('没有询价单可匹配，请先创建')
       fileInput.value.value = ''
       return
     }
-    for (const inquiry of pendingInquiries) {
+    for (const inquiry of targetInquiries) {
       store.clearItemCostEntries(inquiry.id)
     }
-
-    console.log('有效行数:', validRows.length)
-    console.log('mpn列名:', colMap.mpn)
-    console.log('cost列名:', colMap.costPrice)
-    console.log('询价单型号:', pendingInquiries.flatMap(inq => inq.items.map(it => it.mpn)).filter(Boolean))
 
     let matchedCount = 0
     let skippedCount = 0
 
     for (const row of validRows) {
       const rawMpn = row[colMap.mpn]
-      console.log('采购行MPN原始值:', rawMpn, '类型:', typeof rawMpn)
       if (!rawMpn && rawMpn !== 0) { skippedCount++; continue }
       const purchaseMpn = String(rawMpn).trim().toUpperCase()
-      console.log('采购行MPN处理后:', purchaseMpn)
       if (!purchaseMpn) { skippedCount++; continue }
       const purchaseMpnClean = stripSuffixes(purchaseMpn)
 
       let matchedAny = false
-      for (const inquiry of pendingInquiries) {
+      for (const inquiry of targetInquiries) {
         for (let i = 0; i < inquiry.items.length; i++) {
           const item = inquiry.items[i]
           if (!item.mpn) continue
           const inquiryMpn = item.mpn.toUpperCase().trim()
           const inquiryMpnClean = stripSuffixes(inquiryMpn)
 
-          // Match by cleaned MPN, OR original full MPN, OR one contains the other
           const isMatch = (
             inquiryMpnClean === purchaseMpnClean ||
             inquiryMpn === purchaseMpn ||
@@ -201,7 +183,6 @@ async function handleImportFile(e) {
             if (colMap.batch && row[colMap.batch]) entry.costBatch = String(row[colMap.batch])
             if (colMap.quantity && row[colMap.quantity]) entry.costQuantity = String(row[colMap.quantity])
             entry.mpn = purchaseMpn
-
             store.addItemCostEntry(inquiry.id, i, entry)
             matchedCount++
             matchedAny = true
@@ -214,13 +195,12 @@ async function handleImportFile(e) {
       }
     }
 
-    // Step 4: For each inquiry item with costEntries, auto-select lowest cost price
+    // Auto-select lowest cost price
     let autoAppliedCount = 0
-    for (const inquiry of pendingInquiries) {
+    for (const inquiry of targetInquiries) {
       for (let i = 0; i < inquiry.items.length; i++) {
         const item = inquiry.items[i]
         if (item.costEntries && item.costEntries.length > 0) {
-          // Sort by costPrice ascending, pick lowest
           const sorted = [...item.costEntries].sort((a, b) => {
             const pa = parseFloat(a.costPrice) || Infinity
             const pb = parseFloat(b.costPrice) || Infinity
@@ -239,10 +219,7 @@ async function handleImportFile(e) {
         }
       }
     }
-    const msg = matchedCount > 0
-      ? `导入完成：匹配 ${matchedCount} 条采购报价，已为 ${autoAppliedCount} 个询价行自动选择最低成本价`
-      : `导入完成：匹配 0 条，跳过 ${skippedCount} 条`
-    ElMessage.success(msg)
+    ElMessage.success(`导入完成：匹配 ${matchedCount} 条采购报价，已为 ${autoAppliedCount} 个询价行自动选择最低成本价`)
   } catch (err) { ElMessage.error('导入失败: ' + err.message) }
   fileInput.value.value = ''
 }

@@ -100,7 +100,7 @@ async function handleImportFile(e) {
 
     console.log('列映射:', colMap)
 
-    // Filter rows with non-empty cost price
+    // Step 1: Filter rows with non-empty cost price
     const validRows = rows.filter(row => {
       if (!colMap.costPrice) return false
       const cp = row[colMap.costPrice]
@@ -112,15 +112,24 @@ async function handleImportFile(e) {
       return
     }
 
-    // Fuzzy MPN match: shared prefix >= 70% of max MPN length
-    function prefixRatio(a, b) {
-      if (!a || !b) return 0
-      let i = 0
-      const maxLen = Math.min(a.length, b.length)
-      while (i < maxLen && a[i] === b[i]) i++
-      return i / Math.max(a.length, b.length)
+    // Step 2: Load MPN suffix ignore list from settings
+    const MPN_SUFFIX_KEY = 'chip_sales_mpn_suffixes'
+    const suffixStr = localStorage.getItem(MPN_SUFFIX_KEY) || 'TR, T/R, PBF, T&R'
+    const mpnSuffixes = suffixStr.split(',').map(s => s.trim().toUpperCase()).filter(Boolean)
+
+    function stripSuffixes(mpn) {
+      if (!mpn) return ''
+      let cleaned = mpn
+      for (const suffix of mpnSuffixes) {
+        if (cleaned.endsWith(suffix) && cleaned.length > suffix.length) {
+          cleaned = cleaned.slice(0, cleaned.length - suffix.length).trim()
+          break
+        }
+      }
+      return cleaned
     }
 
+    // Step 3: Match same chip by prefix after stripping suffixes
     let matchedCount = 0
     let skippedCount = 0
     const pendingInquiries = store.inquiries.filter(i => i.status === 'pending')
@@ -130,6 +139,7 @@ async function handleImportFile(e) {
       if (!rawMpn && rawMpn !== 0) { skippedCount++; continue }
       const purchaseMpn = String(rawMpn).trim().toUpperCase()
       if (!purchaseMpn) { skippedCount++; continue }
+      const purchaseMpnClean = stripSuffixes(purchaseMpn)
 
       let matchedAny = false
       for (const inquiry of pendingInquiries) {
@@ -137,7 +147,9 @@ async function handleImportFile(e) {
           const item = inquiry.items[i]
           if (!item.mpn) continue
           const inquiryMpn = item.mpn.toUpperCase().trim()
-          if (inquiryMpn === purchaseMpn || prefixRatio(inquiryMpn, purchaseMpn) >= 0.7) {
+          const inquiryMpnClean = stripSuffixes(inquiryMpn)
+
+          if (inquiryMpnClean === purchaseMpnClean) {
             const entry = {}
             if (colMap.costPrice && row[colMap.costPrice] !== undefined && row[colMap.costPrice] !== '') entry.costPrice = String(row[colMap.costPrice])
             if (colMap.currency && row[colMap.currency]) entry.costCurrency = String(row[colMap.currency])
@@ -149,19 +161,7 @@ async function handleImportFile(e) {
             if (colMap.batch && row[colMap.batch]) entry.costBatch = String(row[colMap.batch])
             if (colMap.quantity && row[colMap.quantity]) entry.costQuantity = String(row[colMap.quantity])
             entry.mpn = purchaseMpn
-            entry._index = matchedCount + 1
 
-            // Populate top-level cost from first match
-            if (!item.costEntries || item.costEntries.length === 0) {
-              store.updateItemCost(inquiry.id, i, {
-                costPrice: entry.costPrice || item.costPrice,
-                costQuantity: entry.costQuantity || item.costQuantity,
-                costCurrency: entry.costCurrency || item.costCurrency,
-                costBatch: entry.costBatch || item.costBatch,
-                costSupplier: entry.costSupplier || item.costSupplier,
-                costDeliveryDate: entry.costDeliveryDate || item.costDeliveryDate
-              })
-            }
             store.addItemCostEntry(inquiry.id, i, entry)
             matchedCount++
             matchedAny = true
@@ -170,7 +170,35 @@ async function handleImportFile(e) {
       }
       if (!matchedAny) skippedCount++
     }
-    const msg = `导入完成：匹配 ${matchedCount} 条，跳过 ${skippedCount} 条`
+
+    // Step 4: For each inquiry item with costEntries, auto-select lowest cost price
+    let autoAppliedCount = 0
+    for (const inquiry of pendingInquiries) {
+      for (let i = 0; i < inquiry.items.length; i++) {
+        const item = inquiry.items[i]
+        if (item.costEntries && item.costEntries.length > 0) {
+          // Sort by costPrice ascending, pick lowest
+          const sorted = [...item.costEntries].sort((a, b) => {
+            const pa = parseFloat(a.costPrice) || Infinity
+            const pb = parseFloat(b.costPrice) || Infinity
+            return pa - pb
+          })
+          const best = sorted[0]
+          store.updateItemCost(inquiry.id, i, {
+            costPrice: best.costPrice || item.costPrice,
+            costQuantity: best.costQuantity || item.costQuantity,
+            costCurrency: best.costCurrency || item.costCurrency || 'USD',
+            costBatch: best.costBatch || item.costBatch,
+            costSupplier: best.costSupplier || item.costSupplier,
+            costDeliveryDate: best.costDeliveryDate || item.costDeliveryDate
+          })
+          autoAppliedCount++
+        }
+      }
+    }
+    const msg = matchedCount > 0
+      ? `导入完成：匹配 ${matchedCount} 条采购报价，已为 ${autoAppliedCount} 个询价行自动选择最低成本价`
+      : `导入完成：匹配 0 条，跳过 ${skippedCount} 条`
     ElMessage.success(msg)
   } catch (err) { ElMessage.error('导入失败: ' + err.message) }
   fileInput.value.value = ''

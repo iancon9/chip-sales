@@ -23,6 +23,17 @@
     </div>
 
     <div class="card-minimal">
+      <h4 class="mb-8">MPN 后缀忽略</h4>
+      <p class="text-sm text-muted mb-8">导入采购报价时，将忽略 MPN 末尾的这些固定后缀（逗号分隔，如 TR、T/R、PBF、T&R）</p>
+      <el-form label-width="100px" size="small">
+        <el-form-item label="忽略后缀">
+          <el-input v-model="mpnSuffixInput" placeholder="TR, T/R, PBF, T&R" style="width:400px" @blur="saveMpnSuffix" />
+          <el-button type="primary" size="small" style="margin-left:8px" @click="saveMpnSuffix">保存</el-button>
+        </el-form-item>
+      </el-form>
+    </div>
+
+    <div class="card-minimal">
       <h4 class="mb-8">提成规则配置</h4>
       <p class="text-sm text-muted mb-8">根据利润所在区间确定提成比例和绩点。提成金额 = 利润 × 提成比例，绩效金额 = 利润 × 绩点（不含封顶）。</p>
       <el-table :data="commission.tiers" size="small" style="width:100%">
@@ -69,6 +80,15 @@ const settings = reactive(JSON.parse(localStorage.getItem(SETTINGS_KEY) || JSON.
 const commission = reactive(getCommissionConfig())
 const llmConfig = reactive(getLLMConfig())
 const localRate = ref(settings.exchangeRate || 7.25)
+
+// MPN suffix ignore config
+const MPN_SUFFIX_KEY = 'chip_sales_mpn_suffixes'
+const defaultMpnSuffixes = 'TR, T/R, PBF, T&R'
+const mpnSuffixInput = ref(localStorage.getItem(MPN_SUFFIX_KEY) || defaultMpnSuffixes)
+function saveMpnSuffix() {
+  localStorage.setItem(MPN_SUFFIX_KEY, mpnSuffixInput.value)
+  ElMessage.success('MPN 后缀已保存')
+}
 
 function saveRate() { settings.exchangeRate = localRate.value; ElMessage.success('汇率已保存') }
 

@@ -89,28 +89,37 @@ const emailHtml = computed(() => {
   const tableRows = items.map(item => {
     const remarks = item.remark ? ` (${item.remark})` : ''
     return `<tr>
-      <td style="border:1px solid #ddd;padding:4px 8px;text-align:left">${item.brand || ''}</td>
-      <td style="border:1px solid #ddd;padding:4px 8px;text-align:left">${item.mpn || ''}</td>
-      <td style="border:1px solid #ddd;padding:4px 8px;text-align:left">${Number(item.quantity).toLocaleString()}</td>
-      <td style="border:1px solid #ddd;padding:4px 8px;text-align:left">${item.batch || '-'}</td>
-      <td style="border:1px solid #ddd;padding:4px 8px;text-align:left">$${item.quotedPrice}</td>
-      <td style="border:1px solid #ddd;padding:4px 8px;text-align:left">${item.leadTime || 'TBD'}</td>
-      <td style="border:1px solid #ddd;padding:4px 8px;text-align:left">${item.remark || ''}</td>
+      <td style="border:1px solid #ddd;padding:4px 6px">${item.brand || ''}</td>
+      <td style="border:1px solid #ddd;padding:4px 6px">${item.mpn || ''}</td>
+      <td style="border:1px solid #ddd;padding:4px 6px">${Number(item.quantity).toLocaleString()}</td>
+      <td style="border:1px solid #ddd;padding:4px 6px">${item.batch || '-'}</td>
+      <td style="border:1px solid #ddd;padding:4px 6px">$${item.quotedPrice}</td>
+      <td style="border:1px solid #ddd;padding:4px 6px">${item.leadTime || 'TBD'}</td>
+      <td style="border:1px solid #ddd;padding:4px 6px">${item.remark || ''}</td>
     </tr>`
   }).join('')
 
   return `
     <p>Hi ${getLastName(quote.value.customer.contactName) || 'there'},</p>
     <p>Good day. Please find our quotation below:</p>
-    <table style="border-collapse:collapse;max-width:700px;margin:12px 0;font-size:12px">
+    <table style="border-collapse:collapse;table-layout:fixed;width:680px;margin:12px 0;font-size:12px">
+      <colgroup>
+        <col style="width:80px">
+        <col style="width:140px">
+        <col style="width:60px">
+        <col style="width:60px">
+        <col style="width:80px">
+        <col style="width:80px">
+        <col style="width:100px">
+      </colgroup>
       <tr style="background:#f5f5f5">
-        <th style="border:1px solid #ddd;padding:6px 8px;text-align:left">MFG/Brand</th>
-        <th style="border:1px solid #ddd;padding:6px 8px;text-align:left">P/N</th>
-        <th style="border:1px solid #ddd;padding:6px 8px;text-align:left">QTY</th>
-        <th style="border:1px solid #ddd;padding:6px 8px;text-align:left">D/C</th>
-        <th style="border:1px solid #ddd;padding:6px 8px;text-align:left">PRICE/USD</th>
-        <th style="border:1px solid #ddd;padding:6px 8px;text-align:left">L/T</th>
-        <th style="border:1px solid #ddd;padding:6px 8px;text-align:left">Remark</th>
+        <th style="border:1px solid #ddd;padding:6px;text-align:left">MFG/Brand</th>
+        <th style="border:1px solid #ddd;padding:6px;text-align:left">P/N</th>
+        <th style="border:1px solid #ddd;padding:6px;text-align:left">QTY</th>
+        <th style="border:1px solid #ddd;padding:6px;text-align:left">D/C</th>
+        <th style="border:1px solid #ddd;padding:6px;text-align:left">PRICE/USD</th>
+        <th style="border:1px solid #ddd;padding:6px;text-align:left">L/T</th>
+        <th style="border:1px solid #ddd;padding:6px;text-align:left">Remark</th>
       </tr>
       ${tableRows}
     </table>

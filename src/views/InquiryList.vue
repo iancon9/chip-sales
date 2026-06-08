@@ -100,22 +100,44 @@ async function handleImportFile(e) {
 
     console.log('列映射:', colMap)
 
+    // Filter rows with non-empty cost price
+    const validRows = rows.filter(row => {
+      if (!colMap.costPrice) return false
+      const cp = row[colMap.costPrice]
+      return cp !== undefined && cp !== '' && cp !== 0 && String(cp).trim() !== ''
+    })
+    if (validRows.length === 0) {
+      ElMessage.warning('未找到有效的成本价数据，请检查导入文件格式')
+      fileInput.value.value = ''
+      return
+    }
+
+    // Fuzzy MPN match: shared prefix >= 70% of max MPN length
+    function prefixRatio(a, b) {
+      if (!a || !b) return 0
+      let i = 0
+      const maxLen = Math.min(a.length, b.length)
+      while (i < maxLen && a[i] === b[i]) i++
+      return i / Math.max(a.length, b.length)
+    }
+
     let matchedCount = 0
     let skippedCount = 0
     const pendingInquiries = store.inquiries.filter(i => i.status === 'pending')
 
-    for (const row of rows) {
+    for (const row of validRows) {
       const rawMpn = row[colMap.mpn]
-      if (!rawMpn && rawMpn !== 0) continue
-      const mpn = String(rawMpn).trim().toUpperCase()
-      if (!mpn) continue
+      if (!rawMpn && rawMpn !== 0) { skippedCount++; continue }
+      const purchaseMpn = String(rawMpn).trim().toUpperCase()
+      if (!purchaseMpn) { skippedCount++; continue }
 
-      let matched = false
+      let matchedAny = false
       for (const inquiry of pendingInquiries) {
         for (let i = 0; i < inquiry.items.length; i++) {
           const item = inquiry.items[i]
           if (!item.mpn) continue
-          if (item.mpn.toUpperCase().trim() === mpn) {
+          const inquiryMpn = item.mpn.toUpperCase().trim()
+          if (inquiryMpn === purchaseMpn || prefixRatio(inquiryMpn, purchaseMpn) >= 0.7) {
             const entry = {}
             if (colMap.costPrice && row[colMap.costPrice] !== undefined && row[colMap.costPrice] !== '') entry.costPrice = String(row[colMap.costPrice])
             if (colMap.currency && row[colMap.currency]) entry.costCurrency = String(row[colMap.currency])
@@ -126,9 +148,10 @@ async function handleImportFile(e) {
             }
             if (colMap.batch && row[colMap.batch]) entry.costBatch = String(row[colMap.batch])
             if (colMap.quantity && row[colMap.quantity]) entry.costQuantity = String(row[colMap.quantity])
+            entry.mpn = purchaseMpn
             entry._index = matchedCount + 1
 
-            // First match populates top-level cost fields, all matches go to costEntries
+            // Populate top-level cost from first match
             if (!item.costEntries || item.costEntries.length === 0) {
               store.updateItemCost(inquiry.id, i, {
                 costPrice: entry.costPrice || item.costPrice,
@@ -141,16 +164,14 @@ async function handleImportFile(e) {
             }
             store.addItemCostEntry(inquiry.id, i, entry)
             matchedCount++
-            matched = true
-            break
+            matchedAny = true
           }
         }
-        if (matched) break
       }
-      if (!matched) skippedCount++
+      if (!matchedAny) skippedCount++
     }
-    const msg = `导入完成，匹配了 ${matchedCount} 行采购报价`
-    ElMessage.success(skippedCount > 0 ? msg + `，${skippedCount} 行未匹配` : msg)
+    const msg = `导入完成：匹配 ${matchedCount} 条，跳过 ${skippedCount} 条`
+    ElMessage.success(msg)
   } catch (err) { ElMessage.error('导入失败: ' + err.message) }
   fileInput.value.value = ''
 }

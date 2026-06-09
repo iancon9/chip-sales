@@ -226,7 +226,8 @@ async function handleImportFile(e) {
             costCurrency: best.costCurrency || item.costCurrency || 'USD',
             costBatch: best.costBatch || item.costBatch,
             costSupplier: best.costSupplier || item.costSupplier,
-            costDeliveryDate: best.costDeliveryDate || item.costDeliveryDate
+            costDeliveryDate: best.costDeliveryDate || item.costDeliveryDate,
+            remark: best.costRemark || item.remark
           })
           autoAppliedCount++
         }

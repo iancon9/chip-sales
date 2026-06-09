@@ -137,9 +137,13 @@ function getLastName(name) {
 
 watch(quote, (q) => {
   if (q) {
-    const subj = q.emailSubject || `Quotation - ${q.customer.companyName}`
+    // 优先读取全局模板，其次用该报价单的模板，最后用自动生成的
+    const GLOBAL_EMAIL_KEY = 'chip_sales_global_email_template'
+    const global = JSON.parse(localStorage.getItem(GLOBAL_EMAIL_KEY) || '{}')
+
+    const subj = q.emailSubject || global.subject || `Quotation - ${q.customer.companyName}`
     emailSubject.value = subj; editSubject.value = subj
-    editBody.value = q.emailBody || emailHtml.value
+    editBody.value = q.emailBody || global.body || emailHtml.value
   }
 }, { immediate: true })
 

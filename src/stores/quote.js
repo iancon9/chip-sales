@@ -19,6 +19,8 @@ export const useQuoteStore = defineStore('quote', () => {
       const costUSD = currency === 'RMB' ? costPrice / rate : costPrice
       const { suggestedPrice } = calculateSuggestedPrice(item, costUSD, customerRating)
       const lt = item.costDeliveryDate ? String(item.costDeliveryDate) : 'TBD'
+      const bestRemark = (item.costEntries && item.costEntries.length > 0 && item.costEntries[0].costRemark)
+        ? item.costEntries[0].costRemark : (item.remark || '')
       return {
         brand: item.brand,
         mpn: item.mpn,
@@ -29,7 +31,7 @@ export const useQuoteStore = defineStore('quote', () => {
         suggestedPrice,
         quotedPrice: suggestedPrice,
         leadTime: lt,
-        remark: ''
+        remark: bestRemark
       }
     })
 

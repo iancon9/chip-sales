@@ -47,7 +47,7 @@
 
     <!-- Email Template Preview -->
     <div class="card-minimal">
-      <div class="flex-between mb-16"><h4>邮件模板</h4><div><el-button size="small" type="primary" @click="copyEmailTemplate" style="margin-right:6px">复制到剪贴板</el-button><el-button size="small" @click="saveEmailTemplate">保存模板</el-button></div></div>
+      <div class="flex-between mb-16"><h4>邮件模板</h4><div><el-button size="small" type="primary" @click="copyEmailTemplate" style="margin-right:6px">复制到剪贴板</el-button><el-button size="small" @click="refreshEmailPreview" style="margin-right:6px">刷新预览</el-button><el-button size="small" @click="saveEmailTemplate">保存模板</el-button></div></div>
       <el-input v-model="editSubject" size="small" placeholder="邮件主题" class="mb-8" />
       <el-input v-model="editBody" type="textarea" :rows="8" placeholder="邮件正文（HTML格式）" class="mb-8" />
       <div class="email-preview" v-html="editBody" style="border:1px solid var(--color-border);border-radius:4px;padding:16px;background:#fff;font-size:13px;line-height:1.8;max-height:400px;overflow-y:auto"></div>
@@ -143,10 +143,23 @@ watch(quote, (q) => {
   }
 }, { immediate: true })
 
+function refreshEmailPreview() {
+  if (!quote.value) return
+  editBody.value = emailHtml.value
+  ElMessage.success('已刷新为当前报价数据')
+}
+
 function saveEmailTemplate() {
   if (!quote.value) return
+  // 保存模板到全局，后续所有报价单开箱即用
+  const GLOBAL_EMAIL_KEY = 'chip_sales_global_email_template'
+  const existing = JSON.parse(localStorage.getItem(GLOBAL_EMAIL_KEY) || '{}')
+  existing.subject = editSubject.value
+  existing.body = editBody.value
+  localStorage.setItem(GLOBAL_EMAIL_KEY, JSON.stringify(existing))
+
   quoteStore.updateQuote(quote.value.id, { emailSubject: editSubject.value, emailBody: editBody.value })
-  ElMessage.success('模板已保存')
+  ElMessage.success('模板已保存（应用于所有报价单）')
 }
 
 function copyEmailTemplate() {

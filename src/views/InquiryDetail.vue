@@ -69,6 +69,7 @@
         <el-table-column label="币种" width="70"><template #default="{ row }"><el-select v-model="row.costCurrency" size="small" style="width:100%"><el-option label="USD" value="USD" /><el-option label="RMB" value="RMB" /></el-select></template></el-table-column>
         <el-table-column label="交期" width="100"><template #default="{ row }"><el-input v-model="row.costDeliveryDate" size="small" placeholder="如 7days" /></template></el-table-column>
         <el-table-column label="批次" width="100"><template #default="{ row }"><el-input v-model="row.costBatch" size="small" placeholder="如 24+" /></template></el-table-column>
+        <el-table-column label="备注" width="120"><template #default="{ row }"><el-input v-model="row.remark" size="small" placeholder="备注" /></template></el-table-column>
         <el-table-column label="操作" width="80"><template #default="{ row }"><el-button size="small" type="primary" @click="saveCostForRow(row)">保存</el-button></template></el-table-column>
       </el-table>
     </div>
@@ -131,7 +132,8 @@ function applyCostEntry(itemRow, entryIdx) {
     costCurrency: entry.costCurrency || itemRow.costCurrency || 'USD',
     costBatch: entry.costBatch || itemRow.costBatch,
     costSupplier: entry.costSupplier || itemRow.costSupplier,
-    costDeliveryDate: entry.costDeliveryDate || itemRow.costDeliveryDate
+    costDeliveryDate: entry.costDeliveryDate || itemRow.costDeliveryDate,
+    remark: entry.costRemark || itemRow.remark
   })
   ElMessage.success('已应用该条采购报价到当前行')
 }
@@ -152,6 +154,7 @@ function saveCost(index) {
     costBatch: item.costBatch,
     costSupplier: item.costSupplier,
     costDeliveryDate: item.costDeliveryDate,
+    remark: item.remark,
     batch: item.batch,
     costSupplierType: 'new'
   })

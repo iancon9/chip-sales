@@ -26,6 +26,7 @@ function generateId() { return 'INQ-' + Date.now().toString(36).toUpperCase() }
         package: item.package || '',
         targetPrice: item.targetPrice || '',
         spq: item.spq || '',
+        remark: item.remark || '',
         // Cost fields (filled in inquiry detail or via import)
         costPrice: item.costPrice || '',
         costQuantity: item.costQuantity || '',

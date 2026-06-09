@@ -25,7 +25,7 @@
         <el-table-column label="邮箱" min-width="180"><template #default="{ row }">{{ row.customer.email }}</template></el-table-column>
         <el-table-column label="芯片数" width="70" align="center"><template #default="{ row }">{{ row.items.length }}</template></el-table-column>
         <el-table-column label="状态" width="80"><template #default="{ row }"><el-tag :class="`status-${row.status}`" size="small">{{ store.statusLabels[row.status] }}</el-tag></template></el-table-column>
-        <el-table-column label="创建时间" width="100"><template #default="{ row }">{{ row.createdAt.substring(0,10) }}</template></el-table-column>
+        <el-table-column label="创建时间" width="160"><template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template></el-table-column>
         <el-table-column label="操作" width="160" fixed="right"><template #default="{ row }"><el-button size="small" @click.stop="goDetail(row)">详情</el-button><el-popconfirm title="确定删除？" @confirm="handleDelete(row.id)"><template #reference><el-button size="small" type="danger" @click.stop>删除</el-button></template></el-popconfirm></template></el-table-column>
       </el-table>
     </div>
@@ -52,6 +52,11 @@ const filteredInquiries = computed(() => {
   return list
 })
 
+function formatDateTime(iso) {
+  if (!iso) return '-'
+  const d = new Date(iso)
+  return d.toLocaleDateString('zh-CN') + ' ' + d.toTimeString().substring(0, 8)
+}
 function goDetail(row) { router.push(`/inquiry/${row.id}`) }
 function handleDelete(id) { store.deleteInquiry(id); ElMessage.success('已删除') }
 function triggerImport() { fileInput.value?.click() }
@@ -86,6 +91,7 @@ async function handleImportFile(e) {
       if (!colMap.supplier && /采购员|采购|SUPPLIER|BUYER/i.test(k)) colMap.supplier = k
       if (!colMap.deliveryDate && looksLikeDeliveryDate(k)) colMap.deliveryDate = k
       if (!colMap.batch && /批次|DC|DATE\s*CODE/i.test(u)) colMap.batch = k
+      if (!colMap.remark && /行备注|REMARK|NOTE/i.test(u)) colMap.remark = k
       if (!colMap.quantity && /QTY|数量|QUANTITY/i.test(u)) colMap.quantity = k
     })
 
@@ -187,6 +193,7 @@ async function handleImportFile(e) {
               entry.costDeliveryDate = typeof dv === 'number' ? new Date((dv - 25569) * 86400000).toISOString().substring(0,10) : String(dv)
             }
             if (colMap.batch && row[colMap.batch]) entry.costBatch = String(row[colMap.batch])
+            if (colMap.remark && row[colMap.remark]) entry.costRemark = String(row[colMap.remark])
             if (colMap.quantity && row[colMap.quantity]) entry.costQuantity = String(row[colMap.quantity])
             entry.mpn = purchaseMpn
             store.addItemCostEntry(inquiry.id, i, entry)

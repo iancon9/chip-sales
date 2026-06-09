@@ -13,13 +13,24 @@ export const useQuoteStore = defineStore('quote', () => {
 
   function createQuote(inquiry, selectedItems, customerRating) {
     const rate = parseFloat(localStorage.getItem('chip_sales_settings') ? JSON.parse(localStorage.getItem('chip_sales_settings')).exchangeRate || 7.25 : 7.25)
-    const items = selectedItems.map(item => {
+      const items = selectedItems.map(item => {
       let costPrice = parseFloat(item.costPrice) || 0
       const currency = item.costCurrency || 'USD'
       const costUSD = currency === 'RMB' ? costPrice / rate : costPrice
       const { suggestedPrice } = calculateSuggestedPrice(item, costUSD, customerRating)
       const lt = item.costDeliveryDate ? String(item.costDeliveryDate) : 'TBD'
-      return { brand: item.brand, mpn: item.mpn, quantity: item.quantity, batch: item.batch, costPrice: costUSD, costCurrency: currency, suggestedPrice, quotedPrice: suggestedPrice, leadTime: lt, remark: '' }
+      return {
+        brand: item.brand,
+        mpn: item.mpn,
+        quantity: item.costQuantity || item.quantity,
+        batch: item.costBatch || item.batch,
+        costPrice: costUSD,
+        costCurrency: currency,
+        suggestedPrice,
+        quotedPrice: suggestedPrice,
+        leadTime: lt,
+        remark: ''
+      }
     })
 
     const profitResult = calculateQuoteProfit(items, rate)

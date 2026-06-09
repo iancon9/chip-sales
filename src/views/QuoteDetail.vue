@@ -40,7 +40,7 @@
         </el-table-column>
         <el-table-column label="利润" width="90" align="right"><template #default="{ row }">${{ row.profit?.toLocaleString() }}</template></el-table-column>
         <el-table-column label="利润点" width="80" align="center"><template #default="{ row }">{{ row.profitMargin }}%</template></el-table-column>
-        <el-table-column label="交期" width="90"><template #default="{ row }">{{ row.leadTime }}</template></el-table-column>
+        <el-table-column label="交期" width="110"><template #default="{ row, $index }"><el-input v-model="quote.items[$index].leadTime" size="small" placeholder="如 7days" /></template></el-table-column>
         <el-table-column label="备注" width="120"><template #default="{ row, $index }"><el-input v-model="quote.items[$index].remark" size="small" /></template></el-table-column>
       </el-table>
     </div>

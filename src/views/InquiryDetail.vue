@@ -62,7 +62,7 @@
         </el-table-column>
         <el-table-column label="品牌" min-width="110"><template #default="{ row }">{{ row.brand }}</template></el-table-column>
         <el-table-column label="型号 MPN" min-width="150"><template #default="{ row }"><strong>{{ row.mpn }}</strong></template></el-table-column>
-        <el-table-column label="客户数量" width="90" align="right"><template #default="{ row }">{{ formatNum(row.quantity) }}</template></el-table-column>
+        <el-table-column label="询价数量" width="90" align="right"><template #default="{ row }">{{ formatNum(row.quantity) }}</template></el-table-column>
         <el-table-column label="目标价" width="90"><template #default="{ row }">{{ row.targetPrice ? '$' + row.targetPrice : '-' }}</template></el-table-column>
         <el-table-column label="采购单价" width="100"><template #default="{ row }"><el-input v-model="row.costPrice" size="small" type="number" step="0.01" placeholder="单价" /></template></el-table-column>
         <el-table-column label="采购数量" width="90"><template #default="{ row }"><el-input v-model="row.costQuantity" size="small" placeholder="数量" /></template></el-table-column>

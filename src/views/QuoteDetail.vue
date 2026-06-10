@@ -29,7 +29,8 @@
       <el-table :data="quote.items" size="small" style="width:100%">
         <el-table-column label="品牌" width="100"><template #default="{ row }">{{ row.brand }}</template></el-table-column>
         <el-table-column label="型号" min-width="150"><template #default="{ row }"><strong>{{ row.mpn }}</strong></template></el-table-column>
-        <el-table-column label="数量" width="80" align="right"><template #default="{ row }">{{ Number(row.quantity).toLocaleString() }}</template></el-table-column>
+        <el-table-column label="询价数量" width="90" align="right"><template #default="{ row }">{{ formatQuotedQty(row) }}</template></el-table-column>
+        <el-table-column label="报价数量" width="90" align="right"><template #default="{ row }">{{ Number(row.quantity).toLocaleString() }}</template></el-table-column>
         <el-table-column label="批次" width="100"><template #default="{ row }">{{ row.batch || '-' }}</template></el-table-column>
         <el-table-column label="成本" width="90"><template #default="{ row }">${{ row.costPrice }}</template></el-table-column>
         <el-table-column label="建议价" width="90"><template #default="{ row }">${{ row.suggestedPrice }}</template></el-table-column>
@@ -59,14 +60,25 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useQuoteStore } from '../stores/quote'
+import { useInquiryStore } from '../stores/inquiry'
 import { useClosedDealsStore } from '../stores/closedDeals'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const route = useRoute()
+const inquiryStore = useInquiryStore()
 const quoteStore = useQuoteStore()
 const dealStore = useClosedDealsStore()
 
 const quote = computed(() => quoteStore.getQuote(route.params.id))
+const inquiry = computed(() => {
+  if (!quote.value) return null
+  return inquiryStore.getInquiry(quote.value.inquiryId)
+})
+function formatQuotedQty(row) {
+  if (!inquiry.value) return '-'
+  const inqItem = inquiry.value.items.find(it => it.mpn === row.mpn && it.brand === row.brand)
+  return inqItem ? Number(inqItem.quantity).toLocaleString() : '-'
+}
 const emailSubject = ref('')
 const editSubject = ref('')
 const editBody = ref('')

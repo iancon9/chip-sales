@@ -5,6 +5,28 @@
       <div><el-select v-model="filterMonth" size="small" style="width:160px" @change="refreshData"><el-option v-for="m in monthOptions" :key="m" :label="m" :value="m" /></el-select></div>
     </div>
 
+    <!-- Search Bar -->
+    <div class="card-minimal" style="padding:12px 20px">
+      <el-input v-model="globalSearch" placeholder="搜索芯片型号、品牌、客户名称、邮箱..." size="small" clearable style="width:400px" @input="doGlobalSearch">
+        <template #prefix><el-icon><Search /></el-icon></template>
+      </el-input>
+      <span v-if="globalSearch" class="text-sm text-muted" style="margin-left:12px">找到 {{ searchResults.length }} 条结果</span>
+    </div>
+
+    <!-- Search Results -->
+    <div v-if="globalSearch && searchResults.length > 0" class="card-minimal">
+      <h4 class="mb-8">搜索结果</h4>
+      <el-table :data="searchResults" size="small" style="width:100%">
+        <el-table-column label="来源" width="80"><template #default="{ row }"><el-tag size="small" :type="row.type==='chip'?'info':'success'">{{ row.type === 'chip' ? '芯片' : '客户' }}</el-tag></template></el-table-column>
+        <el-table-column label="型号" min-width="150"><template #default="{ row }">{{ row.mpn || row.customer?.companyName }}</template></el-table-column>
+        <el-table-column label="客户" width="150"><template #default="{ row }">{{ row.customer?.companyName || row.companyName }}</template></el-table-column>
+        <el-table-column label="邮箱" width="200"><template #default="{ row }">{{ row.customer?.email || row.email }}</template></el-table-column>
+        <el-table-column label="询价单" width="140"><template #default="{ row }">{{ row.inquiryId }}</template></el-table-column>
+        <el-table-column label="状态" width="80"><template #default="{ row }"><el-tag size="small" :class="`status-${row.status}`">{{ inquiryStore.statusLabels[row.status] || '-' }}</el-tag></template></el-table-column>
+        <el-table-column label="操作" width="80"><template #default="{ row }"><el-button size="small" @click="goSearchResult(row)">查看</el-button></template></el-table-column>
+      </el-table>
+    </div>
+
     <!-- Top Stats -->
     <el-row :gutter="16" style="margin-bottom:20px">
       <el-col :span="4"><div class="profit-card"><div class="label">询价单</div><div class="value">{{ inquiryStore.inquiries.length }}</div></div></el-col>
@@ -111,6 +133,31 @@ const customerStore = useCustomerStore()
 const dealStore = useClosedDealsStore()
 const showDealEditor = ref(false)
 const editingDeal = ref(null)
+
+// Global search
+const globalSearch = ref('')
+const searchResults = ref([])
+function doGlobalSearch() {
+  const kw = globalSearch.value.trim().toLowerCase()
+  if (!kw) { searchResults.value = []; return }
+  const results = []
+  inquiryStore.inquiries.forEach(inq => {
+    inq.items.forEach(item => {
+      if ((item.mpn && item.mpn.toLowerCase().includes(kw)) || (item.brand && item.brand.toLowerCase().includes(kw))) {
+        results.push({ type: 'chip', mpn: item.mpn, brand: item.brand, customer: inq.customer, inquiryId: inq.id, status: inq.status })
+      }
+    })
+    if (inq.customer.companyName.toLowerCase().includes(kw) || inq.customer.email.toLowerCase().includes(kw)) {
+      results.push({ type: 'customer', companyName: inq.customer.companyName, email: inq.customer.email, inquiryId: inq.id, status: inq.status, customer: inq.customer })
+    }
+  })
+  searchResults.value = results.slice(0, 50)
+}
+function goSearchResult(row) {
+  if (row.inquiryId) {
+    window.open(`#/inquiry/${row.inquiryId}`, '_blank')
+  }
+}
 
 // Month selector
 const filterMonth = ref(new Date().toISOString().substring(0, 7))

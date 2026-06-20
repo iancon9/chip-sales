@@ -124,6 +124,7 @@ const parsing = ref(false)
 const parseMode = ref('')
 const parsingStatus = ref('')
 const parsedItems = ref([])
+const _parsedFileResults = ref([])
 const selectedCustomerId = ref('')
 const defaultItem = { brand: '', mpn: '', quantity: '', targetPrice: '', batch: '', package: '', spq: '' }
 
@@ -153,7 +154,6 @@ function onCustomerSelect(val) {
 function setProgress(msg) { parsingStatus.value = msg }
 
 async function handleEmlFile(file) {
-  // Avoid duplicates by name
   if (emlFiles.value.some(f => f.name === file.name)) return
   try {
     const content = await file.raw.text()
@@ -168,10 +168,7 @@ function removeEmlFile(index) {
 async function parseFile(mode) {
   if (emlFiles.value.length === 0) { ElMessage.warning('请先选择文件'); return }
   parsing.value = true; parseMode.value = mode
-  let allItems = []
-  let firstCustomer = null
-  let allRawEmails = []
-  let allSourceFiles = []
+  const fileResults = []
 
   for (let i = 0; i < emlFiles.value.length; i++) {
     const ef = emlFiles.value[i]
@@ -179,11 +176,13 @@ async function parseFile(mode) {
     setProgress(mode === 'rule' ? `正在解析 ${ef.name}${n}…` : `正在读取 ${ef.name}${n}…`)
     try {
       const result = mode === 'rule' ? parseEml(ef.content, setProgress) : await parseEmlWithAI(ef.content, setProgress)
-      if (!firstCustomer) firstCustomer = result.customer
-      allRawEmails.push(result.rawEmail || '')
-      allSourceFiles.push(ef.name)
       const items = result.items.map(item => ({ ...defaultItem, ...item }))
-      allItems = allItems.concat(items)
+      fileResults.push({
+        name: ef.name,
+        customer: result.customer || { companyName: '', email: '', contactName: '' },
+        rawEmail: result.rawEmail || '',
+        items
+      })
     } catch (e) {
       setProgress('')
       ElMessage.error((mode === 'rule' ? '规则' : 'AI') + `解析失败 (${ef.name}): ` + e.message)
@@ -192,10 +191,16 @@ async function parseFile(mode) {
     }
   }
 
-  form.customer = firstCustomer ? { ...firstCustomer } : { companyName: '', email: '', contactName: '' }
-  form.rawEmail = allRawEmails.join('\n---\n')
-  form.sourceEmlFile = allSourceFiles.join(', ')
+  // Store per-file results for submit
+  _parsedFileResults.value = fileResults
+
+  // Display all items merged in one table for review, use first file's customer
+  const first = fileResults[0]
+  form.customer = first ? { ...first.customer } : { companyName: '', email: '', contactName: '' }
+  form.rawEmail = fileResults.map(fr => fr.rawEmail).filter(Boolean).join('\n---\n')
+  form.sourceEmlFile = fileResults.map(fr => fr.name).join(', ')
   form.items = []
+  const allItems = fileResults.reduce((acc, fr) => acc.concat(fr.items), [])
   parsedItems.value = allItems
   setProgress('')
   ElMessage.success(`解析完成，找到 ${allItems.length} 行（${mode === 'rule' ? '规则解析' : 'AI 解析'}，共 ${emlFiles.value.length} 个文件）`)
@@ -221,6 +226,35 @@ function submitInquiry() {
   items = items.filter(item => item.brand || item.mpn)
   if (!form.customer.companyName && !form.customer.email) { ElMessage.warning('请填写客户公司名称或邮箱'); return }
   if (items.length === 0) { ElMessage.warning('请至少添加一行芯片数据'); return }
+
+  // Multi-file: create one inquiry per file
+  if (inputMethod.value === 'eml' && _parsedFileResults.value.length > 0) {
+    let createdCount = 0
+    let lastId = ''
+    for (const fr of _parsedFileResults.value) {
+      const fileItems = fr.items.filter(item => item.brand || item.mpn)
+      if (fileItems.length === 0) continue
+      const cust = customerStore.findOrCreate(fr.customer.email || form.customer.email, fr.customer.companyName || form.customer.companyName, fr.customer.contactName || form.customer.contactName)
+      const inq = inquiryStore.createInquiry({
+        customer: {
+          companyName: cust.companyName || fr.customer.companyName || form.customer.companyName,
+          email: fr.customer.email || form.customer.email || cust.contacts[0]?.email,
+          contactName: fr.customer.contactName || form.customer.contactName || cust.contacts[0]?.name
+        },
+        items: fileItems,
+        notes: '',
+        rawEmail: fr.rawEmail,
+        sourceEmlFile: fr.name
+      })
+      lastId = inq.id
+      createdCount++
+    }
+    if (createdCount === 0) { ElMessage.warning('没有有效的芯片数据可提交'); return }
+    ElMessage.success(`已创建 ${createdCount} 个询价单`)
+    router.push(`/inquiry/${lastId}`)
+    return
+  }
+
   const customer = customerStore.findOrCreate(form.customer.email, form.customer.companyName, form.customer.contactName)
   const inquiry = inquiryStore.createInquiry({ customer: { companyName: customer.companyName || form.customer.companyName, email: form.customer.email || customer.contacts[0]?.email, contactName: form.customer.contactName || customer.contacts[0]?.name }, items, notes: '', rawEmail: form.rawEmail, sourceEmlFile: form.sourceEmlFile })
   ElMessage.success('询价单创建成功')

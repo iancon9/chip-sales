@@ -45,8 +45,8 @@
       <span style="font-size:14px;color:#3d8fd9">{{ parsingStatus }}</span>
     </div>
 
-    <!-- Parsed Result Table -->
-    <div v-if="parsedItems.length > 0" class="card-minimal">
+    <!-- Parsed Result (single file) -->
+    <div v-if="parsedItems.length > 0 && _parsedFileResults.length <= 1" class="card-minimal">
       <h4 class="mb-8">解析结果（请确认并编辑）</h4>
       <el-form :model="form.customer" label-width="70px" size="small" class="mb-16">
         <el-row :gutter="12">
@@ -70,6 +70,41 @@
       <div class="flex-between mt-16">
         <el-button @click="parsedItems.push({ ...defaultItem })">+ 添加行</el-button>
         <el-button type="primary" @click="submitInquiry">提交询价单</el-button>
+      </div>
+    </div>
+
+    <!-- Parsed Result (multi-file tabs) -->
+    <div v-if="_parsedFileResults.length > 1" class="card-minimal">
+      <h4 class="mb-8">解析结果（请确认并编辑） — 共 {{ _parsedFileResults.length }} 个邮件</h4>
+      <el-tabs v-model="activeEmlTab" type="card">
+        <el-tab-pane v-for="(fr, fi) in _parsedFileResults" :key="fi" :label="fr.name" :name="fi">
+          <el-form :model="fr.customer" label-width="70px" size="small" class="mb-16">
+            <el-row :gutter="12">
+              <el-col :span="8"><el-form-item label="公司"><el-input v-model="_parsedFileResults[fi].customer.companyName" placeholder="客户公司名" /></el-form-item></el-col>
+              <el-col :span="8"><el-form-item label="邮箱"><el-input v-model="_parsedFileResults[fi].customer.email" placeholder="发件人邮箱" /></el-form-item></el-col>
+              <el-col :span="8"><el-form-item label="联系人"><el-input v-model="_parsedFileResults[fi].customer.contactName" placeholder="联系人姓名" /></el-form-item></el-col>
+            </el-row>
+          </el-form>
+
+          <el-table :data="_parsedFileResults[fi].items" size="small" style="width:100%">
+            <el-table-column label="品牌" width="110"><template #default="{ $index }"><el-input v-model="_parsedFileResults[fi].items[$index].brand" size="small" /></template></el-table-column>
+            <el-table-column label="型号 MPN" min-width="150"><template #default="{ $index }"><el-input v-model="_parsedFileResults[fi].items[$index].mpn" size="small" /></template></el-table-column>
+            <el-table-column label="数量" width="100"><template #default="{ $index }"><el-input v-model="_parsedFileResults[fi].items[$index].quantity" size="small" /></template></el-table-column>
+            <el-table-column label="目标价" width="100"><template #default="{ $index }"><el-input v-model="_parsedFileResults[fi].items[$index].targetPrice" size="small" /></template></el-table-column>
+            <el-table-column label="批次" width="100"><template #default="{ $index }"><el-input v-model="_parsedFileResults[fi].items[$index].batch" size="small" /></template></el-table-column>
+            <el-table-column label="封装" width="80"><template #default="{ $index }"><el-input v-model="_parsedFileResults[fi].items[$index].package" size="small" /></template></el-table-column>
+            <el-table-column label="SPQ" width="70"><template #default="{ $index }"><el-input v-model="_parsedFileResults[fi].items[$index].spq" size="small" /></template></el-table-column>
+            <el-table-column label="操作" width="60"><template #default="{ $index }"><el-button size="small" type="danger" @click="_parsedFileResults[fi].items.splice($index,1)"><el-icon><Delete /></el-icon></el-button></template></el-table-column>
+          </el-table>
+          <div class="mt-12">
+            <el-button @click="_parsedFileResults[fi].items.push({ ...defaultItem })">+ 添加行</el-button>
+          </div>
+        </el-tab-pane>
+      </el-tabs>
+
+      <div class="flex-between mt-16">
+        <span></span>
+        <el-button type="primary" @click="submitInquiry">提交所有询价单（{{ _parsedFileResults.length }} 个）</el-button>
       </div>
     </div>
 
@@ -125,6 +160,7 @@ const parseMode = ref('')
 const parsingStatus = ref('')
 const parsedItems = ref([])
 const _parsedFileResults = ref([])
+const activeEmlTab = ref(0)
 const selectedCustomerId = ref('')
 const defaultItem = { brand: '', mpn: '', quantity: '', targetPrice: '', batch: '', package: '', spq: '' }
 

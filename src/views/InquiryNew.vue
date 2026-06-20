@@ -13,16 +13,17 @@
 
     <!-- EML Upload -->
     <div v-if="inputMethod === 'eml'" class="card-minimal">
-      <el-upload drag :auto-upload="false" :on-change="handleEmlFile" accept=".eml" :show-file-list="false">
+      <el-upload drag :auto-upload="false" :on-change="handleEmlFile" accept=".eml" :show-file-list="false" multiple>
         <div class="eml-upload">
           <el-icon :size="36" color="#888"><Upload /></el-icon>
-          <p style="margin-top:12px;color:#888">点击或拖拽 .eml 邮件文件到此区域</p>
+          <p style="margin-top:12px;color:#888">点击或拖拽 .eml 邮件文件到此区域（支持多选）</p>
           <p class="text-sm text-muted">支持网易企业邮箱 / 标准 SMTP 邮件格式</p>
         </div>
       </el-upload>
-      <div v-if="emlFileName" class="mt-16">
-        <div class="text-sm text-muted mb-8">已选择: {{ emlFileName }}</div>
-        <el-row :gutter="8">
+      <div v-if="emlFiles.length > 0" class="mt-16">
+        <div class="text-sm text-muted mb-8">已选择 {{ emlFiles.length }} 个文件：</div>
+        <el-tag v-for="(ef, i) in emlFiles" :key="i" size="small" closable style="margin-right:8px;margin-bottom:4px" :disable-transitions="false" @close="removeEmlFile(i)">{{ ef.name }}</el-tag>
+        <el-row :gutter="8" style="margin-top:12px">
           <el-col :span="12"><el-button type="primary" @click="parseFile('rule')" :loading="parsing && parseMode==='rule'" style="width:100%">规则解析（秒级）</el-button></el-col>
           <el-col :span="12"><el-button type="success" @click="parseFile('ai')" :loading="parsing && parseMode==='ai'" style="width:100%">AI 解析（需配置 LLM）</el-button></el-col>
         </el-row>
@@ -118,8 +119,7 @@ const customerStore = useCustomerStore()
 
 const inputMethod = ref('eml')
 const pasteText = ref('')
-const emlFileName = ref('')
-const emlContent = ref('')
+const emlFiles = ref([])
 const parsing = ref(false)
 const parseMode = ref('')
 const parsingStatus = ref('')
@@ -153,20 +153,52 @@ function onCustomerSelect(val) {
 function setProgress(msg) { parsingStatus.value = msg }
 
 async function handleEmlFile(file) {
-  emlFileName.value = file.name
-  try { emlContent.value = await file.raw.text() } catch { ElMessage.error('读取文件失败') }
+  // Avoid duplicates by name
+  if (emlFiles.value.some(f => f.name === file.name)) return
+  try {
+    const content = await file.raw.text()
+    emlFiles.value.push({ name: file.name, content })
+  } catch { ElMessage.error('读取文件失败: ' + file.name) }
+}
+
+function removeEmlFile(index) {
+  emlFiles.value.splice(index, 1)
 }
 
 async function parseFile(mode) {
-  if (!emlContent.value) { ElMessage.warning('请先选择文件'); return }
-  parsing.value = true; parseMode.value = mode; setProgress(mode === 'rule' ? '正在解析邮件格式…' : '正在读取邮件内容…')
-  try {
-    const result = mode === 'rule' ? parseEml(emlContent.value, setProgress) : await parseEmlWithAI(emlContent.value, setProgress)
-    form.customer = { ...result.customer }; form.rawEmail = result.rawEmail || ''; form.sourceEmlFile = emlFileName.value
-    form.items = []; parsedItems.value = result.items.map(item => ({ ...defaultItem, ...item }))
-    setProgress('')
-    ElMessage.success(`解析完成，找到 ${parsedItems.value.length} 行（${mode === 'rule' ? '规则解析' : 'AI 解析'}）`)
-  } catch (e) { setProgress(''); ElMessage.error((mode === 'rule' ? '规则' : 'AI') + '解析失败: ' + e.message) }
+  if (emlFiles.value.length === 0) { ElMessage.warning('请先选择文件'); return }
+  parsing.value = true; parseMode.value = mode
+  let allItems = []
+  let firstCustomer = null
+  let allRawEmails = []
+  let allSourceFiles = []
+
+  for (let i = 0; i < emlFiles.value.length; i++) {
+    const ef = emlFiles.value[i]
+    const n = emlFiles.value.length === 1 ? '' : ` (${i + 1}/${emlFiles.value.length})`
+    setProgress(mode === 'rule' ? `正在解析 ${ef.name}${n}…` : `正在读取 ${ef.name}${n}…`)
+    try {
+      const result = mode === 'rule' ? parseEml(ef.content, setProgress) : await parseEmlWithAI(ef.content, setProgress)
+      if (!firstCustomer) firstCustomer = result.customer
+      allRawEmails.push(result.rawEmail || '')
+      allSourceFiles.push(ef.name)
+      const items = result.items.map(item => ({ ...defaultItem, ...item }))
+      allItems = allItems.concat(items)
+    } catch (e) {
+      setProgress('')
+      ElMessage.error((mode === 'rule' ? '规则' : 'AI') + `解析失败 (${ef.name}): ` + e.message)
+      parsing.value = false
+      return
+    }
+  }
+
+  form.customer = firstCustomer ? { ...firstCustomer } : { companyName: '', email: '', contactName: '' }
+  form.rawEmail = allRawEmails.join('\n---\n')
+  form.sourceEmlFile = allSourceFiles.join(', ')
+  form.items = []
+  parsedItems.value = allItems
+  setProgress('')
+  ElMessage.success(`解析完成，找到 ${allItems.length} 行（${mode === 'rule' ? '规则解析' : 'AI 解析'}，共 ${emlFiles.value.length} 个文件）`)
   parsing.value = false
 }
 

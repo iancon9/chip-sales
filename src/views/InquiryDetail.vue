@@ -127,6 +127,7 @@ function applyCostEntry(itemRow, entryIdx) {
   const idx = inquiry.value.items.indexOf(itemRow)
   if (idx === -1) return
   store.updateItemCost(inquiry.value.id, idx, {
+    mpn: entry.mpn || itemRow.mpn,
     costPrice: entry.costPrice || itemRow.costPrice,
     costQuantity: entry.costQuantity || itemRow.costQuantity,
     costCurrency: entry.costCurrency || itemRow.costCurrency || 'USD',
@@ -135,7 +136,7 @@ function applyCostEntry(itemRow, entryIdx) {
     costDeliveryDate: entry.costDeliveryDate || itemRow.costDeliveryDate,
     remark: entry.costRemark || itemRow.remark
   })
-  ElMessage.success('已应用该条采购报价到当前行')
+  ElMessage.success('已应用该条采购报价到当前行（含 MPN）')
 }
 
 function saveCostForRow(row) {

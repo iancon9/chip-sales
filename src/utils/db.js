@@ -1,25 +1,12 @@
-/**
- * IndexedDB-backed storage with in-memory cache.
- *
- * Replaces localStorage to bypass the 5-10MB per-origin limit.
- * On first load, auto-migrates existing localStorage chip_sales_* keys.
- *
- * Design:
- *   - Reads are synchronous (memory cache), so Pinia setup() works unchanged.
- *   - Writes go to memory cache immediately, then persisted to IndexedDB async.
- *   - Falls back to localStorage if IndexedDB is unavailable.
- */
-
 const DB_NAME = 'chip_sales_db'
 const DB_VERSION = 1
 const STORE_NAME = 'kv'
+const MIGRATED_KEY = '__migrated__'
 
-/** @type {IDBDatabase|null} */
 let db = null
 let initPromise = null
 let fallbackToLocalStorage = false
 
-/** In-memory cache: key → parsed value */
 const cache = new Map()
 
 // ---------------------------------------------------------------------------
@@ -29,7 +16,7 @@ const cache = new Map()
 async function openDB() {
   if (initPromise) return initPromise
 
-  initPromise = new Promise((resolve, reject) => {
+  initPromise = new Promise((resolve) => {
     if (!window.indexedDB) {
       fallbackToLocalStorage = true
       return resolve(null)
@@ -38,14 +25,14 @@ async function openDB() {
     const request = indexedDB.open(DB_NAME, DB_VERSION)
 
     request.onupgradeneeded = (event) => {
-      const d = /** @type {IDBDatabase} */ (event.target.result)
+      const d = event.target.result
       if (!d.objectStoreNames.contains(STORE_NAME)) {
         d.createObjectStore(STORE_NAME)
       }
     }
 
     request.onsuccess = (event) => {
-      db = /** @type {IDBDatabase} */ (event.target.result)
+      db = event.target.result
       resolve(db)
     }
 
@@ -57,7 +44,7 @@ async function openDB() {
     }
 
     request.onblocked = () => {
-      console.warn('[db] IndexedDB blocked - another tab may have an open connection')
+      console.warn('[db] IndexedDB blocked')
       fallbackToLocalStorage = true
       resolve(null)
     }
@@ -111,41 +98,53 @@ function idbDelete(key) {
   })
 }
 
-async function idbGetAll() {
-  if (!db) return {}
+function idbGetAll() {
+  if (!db) return Promise.resolve({})
   return new Promise((resolve, reject) => {
     try {
       const tx = db.transaction(STORE_NAME, 'readonly')
       const store = tx.objectStore(STORE_NAME)
-      const keysReq = store.getAllKeys()
-      const valsReq = store.getAll()
-      let done = 0
+      const req = store.openCursor()
       const result = {}
-      const check = () => {
-        done++
-        if (done === 2) {
-          keysReq.result.forEach((k, i) => { result[k] = valsReq.result[i] })
+      req.onsuccess = (event) => {
+        const cursor = event.target.result
+        if (cursor) {
+          result[cursor.key] = cursor.value
+          cursor.continue()
+        } else {
           resolve(result)
         }
       }
-      keysReq.onsuccess = check
-      keysReq.onerror = () => reject(keysReq.error)
-      valsReq.onsuccess = check
-      valsReq.onerror = () => reject(valsReq.error)
+      req.onerror = () => reject(req.error)
     } catch (e) {
       reject(e)
     }
   })
 }
 
-async function idbClear() {
-  if (!db) return
+function idbClear() {
+  if (!db) return Promise.resolve()
   return new Promise((resolve, reject) => {
     try {
       const tx = db.transaction(STORE_NAME, 'readwrite')
       const store = tx.objectStore(STORE_NAME)
       const req = store.clear()
       req.onsuccess = () => resolve()
+      req.onerror = () => reject(req.error)
+    } catch (e) {
+      reject(e)
+    }
+  })
+}
+
+function idbCount() {
+  if (!db) return Promise.resolve(0)
+  return new Promise((resolve, reject) => {
+    try {
+      const tx = db.transaction(STORE_NAME, 'readonly')
+      const store = tx.objectStore(STORE_NAME)
+      const req = store.count()
+      req.onsuccess = () => resolve(req.result)
       req.onerror = () => reject(req.error)
     } catch (e) {
       reject(e)
@@ -166,38 +165,34 @@ async function migrateFromLocalStorage() {
     }
   }
 
-  if (keys.length === 0) return 0
+  if (keys.length === 0) {
+    await idbSet(MIGRATED_KEY, true)
+    return 0
+  }
 
   console.log(`[db] Migrating ${keys.length} keys from localStorage to IndexedDB...`)
 
-  let migrated = 0
   for (const key of keys) {
     const raw = localStorage.getItem(key)
     let value = raw
     try { value = JSON.parse(raw) } catch { /* keep as string */ }
     cache.set(key, value)
-    await idbSet(key, value).catch(() => {})
-    migrated++
+    await idbSet(key, value)
   }
 
-  console.log(`[db] Migration complete: ${migrated} keys`)
-  return migrated
+  await idbSet(MIGRATED_KEY, true)
+  console.log('[db] Migration complete:', keys.length, 'keys')
+  return keys.length
 }
 
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
-/**
- * Initialize storage. Must be called once before any read/write.
- * Loads all data from IndexedDB into memory cache.
- * If IndexedDB is empty, migrates from localStorage.
- */
 export async function initStorage() {
   await openDB()
 
   if (fallbackToLocalStorage) {
-    // Load localStorage into cache so reads work
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i)
       if (key && key.startsWith('chip_sales_')) {
@@ -211,29 +206,31 @@ export async function initStorage() {
     return
   }
 
-  // Load from IndexedDB
-  const allData = await idbGetAll().catch(() => ({}))
+  let allData
+  try {
+    allData = await idbGetAll()
+  } catch (e) {
+    console.error('[db] Failed to read from IndexedDB, falling back:', e)
+    fallbackToLocalStorage = true
+    return initStorage()
+  }
+
   for (const [key, value] of Object.entries(allData)) {
     cache.set(key, value)
   }
 
-  // If DB is empty, migrate from localStorage
-  if (cache.size === 0) {
+  if (!cache.has(MIGRATED_KEY)) {
     await migrateFromLocalStorage()
+  } else {
+    cache.delete(MIGRATED_KEY)
   }
 }
 
-/**
- * Synchronous read. Returns defaultValue if key not found.
- */
 export function storageGet(key, defaultValue = null) {
   if (cache.has(key)) return cache.get(key)
   return defaultValue
 }
 
-/**
- * Write to memory cache immediately, persist to IndexedDB async.
- */
 export function storageSet(key, value) {
   cache.set(key, value)
 
@@ -241,18 +238,20 @@ export function storageSet(key, value) {
     try {
       localStorage.setItem(key, JSON.stringify(value))
     } catch (e) {
-      console.error('[db] localStorage write failed (quota exceeded?):', e)
+      console.error('[db] localStorage write failed:', e)
     }
-  } else {
-    idbSet(key, value).catch(err => {
-      console.error('[db] IndexedDB write failed for', key, ':', err)
-    })
+    return
   }
+
+  idbSet(key, value).catch(err => {
+    console.error('[db] IndexedDB write failed for', key, ':', err)
+    fallbackToLocalStorage = true
+    try {
+      localStorage.setItem(key, JSON.stringify(value))
+    } catch { /* last resort */ }
+  })
 }
 
-/**
- * Delete a key from both cache and persistent storage.
- */
 export function storageDelete(key) {
   cache.delete(key)
   if (fallbackToLocalStorage) {
@@ -262,27 +261,23 @@ export function storageDelete(key) {
   }
 }
 
-/**
- * Export all data as a plain object (JSON-serializable).
- */
 export async function storageExport() {
-  // Refresh from IndexedDB to ensure we have latest
   if (!fallbackToLocalStorage && db) {
-    const allData = await idbGetAll().catch(() => ({}))
-    for (const [key, value] of Object.entries(allData)) {
-      cache.set(key, value)
-    }
+    try {
+      const allData = await idbGetAll()
+      for (const [key, value] of Object.entries(allData)) {
+        cache.set(key, value)
+      }
+    } catch { /* use cache */ }
   }
   const result = {}
   for (const [key, value] of cache) {
+    if (key === MIGRATED_KEY) continue
     result[key] = value
   }
   return result
 }
 
-/**
- * Import data (from JSON backup). Overwrites existing keys.
- */
 export async function storageImport(data) {
   const entries = Object.entries(data)
   for (const [key, value] of entries) {
@@ -290,17 +285,15 @@ export async function storageImport(data) {
     if (fallbackToLocalStorage) {
       try {
         localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value))
-      } catch { /* skip on quota error */ }
+      } catch { /* skip */ }
     } else {
-      await idbSet(key, value).catch(() => {})
+      await idbSet(key, value)
     }
   }
+  await idbSet(MIGRATED_KEY, true)
   return entries.length
 }
 
-/**
- * Clear all chip_sales data from cache and persistent storage.
- */
 export async function storageClear() {
   cache.clear()
   if (fallbackToLocalStorage) {
@@ -311,13 +304,11 @@ export async function storageClear() {
     }
     keys.forEach(k => localStorage.removeItem(k))
   } else {
-    await idbClear().catch(() => {})
+    await idbClear()
+    await idbSet(MIGRATED_KEY, true)
   }
 }
 
-/**
- * Check if falling back to localStorage.
- */
 export function isFallback() {
   return fallbackToLocalStorage
 }

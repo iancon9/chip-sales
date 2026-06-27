@@ -4,6 +4,7 @@
       <div><h2>询价单</h2><p class="text-muted">管理所有客户询价</p></div>
       <div>
         <el-button @click="triggerImport" style="margin-right:8px">导入采购报价</el-button>
+        <el-button @click="exportSelected" :disabled="selectedInquiries.length === 0" style="margin-right:8px">导出 Excel ({{ selectedInquiries.length }})</el-button>
         <input ref="fileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none" @change="handleImportFile" />
         <el-button type="primary" @click="$router.push('/inquiry/new')"><el-icon><Plus /></el-icon> 新建询价单</el-button>
       </div>
@@ -18,7 +19,8 @@
     </div>
 
     <div class="card-minimal">
-      <el-table :data="filteredInquiries" size="small" style="width:100%" @row-click="goDetail" highlight-current-row>
+      <el-table :data="filteredInquiries" size="small" style="width:100%" @row-click="goDetail" highlight-current-row @selection-change="handleSelectionChange">
+        <el-table-column type="selection" width="40" />
         <el-table-column prop="id" label="编号" width="130" />
         <el-table-column label="客户" width="130"><template #default="{ row }">{{ row.customer.companyName }}</template></el-table-column>
         <el-table-column label="联系人" width="100"><template #default="{ row }">{{ row.customer.contactName }}</template></el-table-column>
@@ -42,6 +44,7 @@ import * as XLSX from 'xlsx'
 
 const router = useRouter(); const store = useInquiryStore()
 const filterKeyword = ref(''); const filterStatus = ref(''); const filterMonth = ref(''); const fileInput = ref(null)
+const selectedInquiries = ref([])
 
 const monthOptions = computed(() => { const ms = new Set(store.inquiries.map(i => i.createdAt.substring(0,7))); const d = new Date(); for (let i=0; i<12; i++) { ms.add(d.toISOString().substring(0,7)); d.setMonth(d.getMonth()-1) }; return [...ms].sort().reverse() })
 
@@ -60,6 +63,43 @@ function formatDateTime(iso) {
 }
 function goDetail(row) { router.push(`/inquiry/${row.id}`) }
 function handleDelete(id) { store.deleteInquiry(id); ElMessage.success('已删除') }
+function handleSelectionChange(rows) { selectedInquiries.value = rows }
+
+function exportSelected() {
+  if (selectedInquiries.value.length === 0) return
+  const rows = []
+  for (const inquiry of selectedInquiries.value) {
+    for (const item of inquiry.items) {
+      rows.push({
+        '询价编号': inquiry.id,
+        '客户': inquiry.customer.companyName,
+        '联系人': inquiry.customer.contactName,
+        '邮箱': inquiry.customer.email,
+        '品牌': item.brand,
+        '型号': item.mpn,
+        '数量': item.quantity,
+        '目标价': item.targetPrice,
+        '批次': item.batch,
+        '封装': item.package,
+        'SPQ': item.spq,
+        '成本价': item.costPrice,
+        '成本币种': item.costCurrency,
+        '成本供应商': item.costSupplier,
+        '成本交期': item.costDeliveryDate,
+        '成本批次': item.costBatch,
+        '成本数量': item.costQuantity,
+        '备注': item.remark,
+        '状态': store.statusLabels[inquiry.status],
+        '日期': inquiry.createdAt.substring(0, 10)
+      })
+    }
+  }
+  const ws = XLSX.utils.json_to_sheet(rows)
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Inquiries')
+  XLSX.writeFile(wb, `询价导出_${new Date().toISOString().substring(0,10)}.xlsx`)
+  ElMessage.success(`导出 ${rows.length} 条记录`)
+}
 function triggerImport() { fileInput.value?.click() }
 
 function looksLikeCostPrice(colName) {

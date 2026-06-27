@@ -256,26 +256,35 @@ export function storageGet(key, defaultValue = null) {
   return defaultValue
 }
 
+function deepClone(value) {
+  try {
+    return JSON.parse(JSON.stringify(value))
+  } catch {
+    return value
+  }
+}
+
 export function storageSet(key, value) {
-  cache.set(key, value)
+  const plainValue = deepClone(value)
+  cache.set(key, plainValue)
 
   if (fallbackToLocalStorage) {
     try {
-      localStorage.setItem(key, JSON.stringify(value))
-      console.log('[db] set via localStorage:', key, 'size:', JSON.stringify(value).length)
+      localStorage.setItem(key, JSON.stringify(plainValue))
+      console.log('[db] set via localStorage:', key)
     } catch (e) {
       console.error('[db] localStorage write failed for', key, ':', e.message)
     }
     return
   }
 
-  idbSet(key, value).then(() => {
+  idbSet(key, plainValue).then(() => {
     console.log('[db] set OK:', key)
   }).catch(err => {
     console.error('[db] IndexedDB write failed for', key, ':', err)
     fallbackToLocalStorage = true
     try {
-      localStorage.setItem(key, JSON.stringify(value))
+      localStorage.setItem(key, JSON.stringify(plainValue))
     } catch (e2) {
       console.error('[db] localStorage fallback also failed:', e2.message)
     }

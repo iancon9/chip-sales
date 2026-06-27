@@ -2,17 +2,19 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { calculateSuggestedPrice, calculateLeadTime } from '../utils/pricingEngine'
 import { calculateQuoteProfit, calculateCommission } from '../utils/commission'
+import { storageGet, storageSet } from '../utils/db'
 
 const STORAGE_KEY = 'chip_sales_quotes'
-function load() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [] } catch { return [] } }
-function save(data) { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)) }
+function load() { return storageGet(STORAGE_KEY, []) }
+function save(data) { storageSet(STORAGE_KEY, data) }
 
 export const useQuoteStore = defineStore('quote', () => {
   const quotes = ref(load())
   function generateId() { return 'QTE-' + Date.now().toString(36).toUpperCase() }
 
   function createQuote(inquiry, selectedItems, customerRating) {
-    const rate = parseFloat(localStorage.getItem('chip_sales_settings') ? JSON.parse(localStorage.getItem('chip_sales_settings')).exchangeRate || 7.25 : 7.25)
+    const settings = storageGet('chip_sales_settings', { exchangeRate: 7.25 })
+    const rate = parseFloat(settings.exchangeRate || 7.25)
       const items = selectedItems.map(item => {
       let costPrice = parseFloat(item.costPrice) || 0
       const currency = item.costCurrency || 'USD'

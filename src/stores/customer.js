@@ -1,10 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { storageGet, storageSet } from '../utils/db'
 
 const STORAGE_KEY = 'chip_sales_customers'
 
-function load() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [] } catch { return [] } }
-function save(data) { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)) }
+function load() { return storageGet(STORAGE_KEY, []) }
+function save(data) { storageSet(STORAGE_KEY, data) }
 
 export const useCustomerStore = defineStore('customer', () => {
   const customers = ref(load())

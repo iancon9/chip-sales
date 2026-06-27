@@ -2,6 +2,8 @@
  * Pricing Engine - Calculate suggested price based on cost + coefficients
  */
 
+import { storageGet } from './db'
+
 const DEFAULT_PRICING = {
   baseMargin: 0.15,
   ratingCoefficient: { A: 1.0, B: 1.05, C: 1.10, D: 1.20 },
@@ -28,9 +30,7 @@ const DEFAULT_PRICING = {
 }
 
 export function getPricingConfig() {
-  try {
-    return JSON.parse(localStorage.getItem('chip_sales_pricing') || JSON.stringify(DEFAULT_PRICING))
-  } catch { return DEFAULT_PRICING }
+  return storageGet('chip_sales_pricing', DEFAULT_PRICING)
 }
 
 /**

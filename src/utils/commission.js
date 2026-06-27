@@ -3,6 +3,8 @@
  * Based on 6-tier profit commission rules (RMB)
  */
 
+import { storageGet, storageSet } from './db'
+
 const DEFAULT_COMMISSION = {
   commissionWeight: 0.70,
   performanceWeight: 0.30,
@@ -23,13 +25,11 @@ const DEFAULT_COMMISSION = {
 }
 
 export function getCommissionConfig() {
-  try {
-    return JSON.parse(localStorage.getItem('chip_sales_commission') || JSON.stringify(DEFAULT_COMMISSION))
-  } catch { return DEFAULT_COMMISSION }
+  return storageGet('chip_sales_commission', DEFAULT_COMMISSION)
 }
 
 export function saveCommissionConfig(config) {
-  localStorage.setItem('chip_sales_commission', JSON.stringify(config))
+  storageSet('chip_sales_commission', config)
 }
 
 /**

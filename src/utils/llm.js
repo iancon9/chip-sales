@@ -5,12 +5,16 @@
  * Actual LLM email parsing logic is in emlParser.js (parseEmlWithLLM).
  */
 
+import { storageGet, storageSet } from './db'
+
 export function getLLMConfig() {
-  try {
-    return JSON.parse(localStorage.getItem('chip_sales_llm_config') || '{"apiKey":"","endpoint":"https://api.openai.com/v1/chat/completions","model":"gpt-3.5-turbo"}')
-  } catch { return { apiKey: '', endpoint: '', model: 'gpt-3.5-turbo' } }
+  return storageGet('chip_sales_llm_config', {
+    apiKey: '',
+    endpoint: 'https://api.openai.com/v1/chat/completions',
+    model: 'gpt-3.5-turbo'
+  })
 }
 
 export function saveLLMConfig(config) {
-  localStorage.setItem('chip_sales_llm_config', JSON.stringify(config))
+  storageSet('chip_sales_llm_config', config)
 }

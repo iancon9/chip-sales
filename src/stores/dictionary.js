@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { storageGet, storageSet } from '../utils/db'
 
 const STORAGE_KEY = 'chip_sales_dictionary'
 
@@ -18,8 +19,8 @@ const DEFAULT_MODELS = [
   { brand: 'SHINDENGEN', mpn: 'D3UBA80-7062', scarce: false },
 ]
 
-function load() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || DEFAULT_MODELS } catch { return DEFAULT_MODELS } }
-function save(data) { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)) }
+function load() { return storageGet(STORAGE_KEY, DEFAULT_MODELS) }
+function save(data) { storageSet(STORAGE_KEY, data) }
 
 export const useDictionaryStore = defineStore('dictionary', () => {
   const models = ref(load())

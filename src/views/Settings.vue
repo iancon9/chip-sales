@@ -63,6 +63,7 @@ import { reactive, ref, onMounted, inject, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getCommissionConfig, saveCommissionConfig } from '../utils/commission'
 import { getLLMConfig, saveLLMConfig as saveLLMToStorage } from '../utils/llm'
+import { storageGet, storageSet, storageExport, storageImport, storageClear } from '../utils/db'
 
 const darkMode = inject('darkMode')
 const isDark = ref(false)
@@ -76,7 +77,7 @@ onMounted(() => {
 const SETTINGS_KEY = 'chip_sales_settings'
 const defaultSettings = { exchangeRate: 7.25, emailSignature: { zh: '此致\nBest regards,\n{公司名} {姓名}', en: 'Best regards,\n{Name}\n{Company}', ko: '감사합니다.\n{Name} 드림' } }
 
-const settings = reactive(JSON.parse(localStorage.getItem(SETTINGS_KEY) || JSON.stringify(defaultSettings)))
+const settings = reactive(storageGet(SETTINGS_KEY, defaultSettings))
 const commission = reactive(getCommissionConfig())
 const llmConfig = reactive(getLLMConfig())
 const localRate = ref(settings.exchangeRate || 7.25)
@@ -84,34 +85,33 @@ const localRate = ref(settings.exchangeRate || 7.25)
 // MPN suffix ignore config
 const MPN_SUFFIX_KEY = 'chip_sales_mpn_suffixes'
 const defaultMpnSuffixes = 'TR, T/R, PBF, T&R'
-const mpnSuffixInput = ref(localStorage.getItem(MPN_SUFFIX_KEY) || defaultMpnSuffixes)
+const mpnSuffixInput = ref(storageGet(MPN_SUFFIX_KEY, defaultMpnSuffixes))
 function saveMpnSuffix() {
-  localStorage.setItem(MPN_SUFFIX_KEY, mpnSuffixInput.value)
+  storageSet(MPN_SUFFIX_KEY, mpnSuffixInput.value)
   ElMessage.success('MPN 后缀已保存')
 }
 
 function saveRate() { settings.exchangeRate = localRate.value; ElMessage.success('汇率已保存') }
 
-watch(settings, () => localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)), { deep: true })
+watch(settings, () => storageSet(SETTINGS_KEY, { ...settings }), { deep: true })
 watch(commission, () => saveCommissionConfig(commission), { deep: true })
 
 function saveLLM() { saveLLMToStorage({ ...llmConfig }); ElMessage.success('LLM 配置已保存') }
 function toggleDark() { if (darkMode) darkMode.toggle() }
 function changeLang(lang) { localStorage.setItem('chip_sales_language', lang); location.reload() }
 
-function exportData() {
-  const data = {}
-  for (let i = 0; i < localStorage.length; i++) { const key = localStorage.key(i); if (key.startsWith('chip_sales_')) { try { data[key] = JSON.parse(localStorage.getItem(key)) } catch { data[key] = localStorage.getItem(key) } } }
+async function exportData() {
+  const data = await storageExport()
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
   const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `chip_sales_backup_${new Date().toISOString().substring(0,10)}.json`; a.click(); URL.revokeObjectURL(url)
   ElMessage.success('数据导出成功')
 }
 
 async function handleImport(file) {
-  try { const text = await file.raw.text(); const data = JSON.parse(text); let count = 0; for (const [key, value] of Object.entries(data)) { localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value)); count++ }; ElMessage.success(`已导入 ${count} 个数据表，请刷新页面`); setTimeout(() => location.reload(), 1500) } catch (e) { ElMessage.error('导入失败: ' + e.message) }
+  try { const text = await file.raw.text(); const data = JSON.parse(text); const count = await storageImport(data); ElMessage.success(`已导入 ${count} 个数据表，请刷新页面`); setTimeout(() => location.reload(), 1500) } catch (e) { ElMessage.error('导入失败: ' + e.message) }
 }
 
 async function handleClearAll() {
-  try { await ElMessageBox.confirm('这将清除所有本地数据。确定继续？', '危险操作', { type: 'warning', confirmButtonText: '确认清除' }); const keys = []; for (let i=0; i<localStorage.length; i++) { const k = localStorage.key(i); if (k.startsWith('chip_sales_')) keys.push(k) }; keys.forEach(k => localStorage.removeItem(k)); ElMessage.success(`已清除 ${keys.length} 个数据表，即将刷新`); setTimeout(() => location.reload(), 1000) } catch {}
+  try { await ElMessageBox.confirm('这将清除所有本地数据。确定继续？', '危险操作', { type: 'warning', confirmButtonText: '确认清除' }); await storageClear(); ElMessage.success('数据已清除，即将刷新'); setTimeout(() => location.reload(), 1000) } catch {}
 }
 </script>

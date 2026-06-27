@@ -18,6 +18,7 @@ async function openDB() {
 
   initPromise = new Promise((resolve) => {
     if (!window.indexedDB) {
+      console.log('[db] IndexedDB not available')
       fallbackToLocalStorage = true
       return resolve(null)
     }
@@ -25,6 +26,7 @@ async function openDB() {
     const request = indexedDB.open(DB_NAME, DB_VERSION)
 
     request.onupgradeneeded = (event) => {
+      console.log('[db] onupgradeneeded')
       const d = event.target.result
       if (!d.objectStoreNames.contains(STORE_NAME)) {
         d.createObjectStore(STORE_NAME)
@@ -33,18 +35,19 @@ async function openDB() {
 
     request.onsuccess = (event) => {
       db = event.target.result
+      console.log('[db] opened OK, stores:', Array.from(db.objectStoreNames))
       resolve(db)
     }
 
     request.onerror = (event) => {
-      console.warn('[db] IndexedDB open failed, falling back to localStorage:', event.target.error)
+      console.warn('[db] open failed:', event.target.error)
       fallbackToLocalStorage = true
       db = null
       resolve(null)
     }
 
     request.onblocked = () => {
-      console.warn('[db] IndexedDB blocked')
+      console.warn('[db] blocked')
       fallbackToLocalStorage = true
       resolve(null)
     }
@@ -112,6 +115,7 @@ function idbGetAll() {
           result[cursor.key] = cursor.value
           cursor.continue()
         } else {
+          console.log('[db] idbGetAll returned', Object.keys(result).length, 'keys:', Object.keys(result))
           resolve(result)
         }
       }
@@ -137,23 +141,19 @@ function idbClear() {
   })
 }
 
-function idbCount() {
-  if (!db) return Promise.resolve(0)
-  return new Promise((resolve, reject) => {
-    try {
-      const tx = db.transaction(STORE_NAME, 'readonly')
-      const store = tx.objectStore(STORE_NAME)
-      const req = store.count()
-      req.onsuccess = () => resolve(req.result)
-      req.onerror = () => reject(req.error)
-    } catch (e) {
-      reject(e)
-    }
-  })
+async function probeIDB() {
+  try {
+    await idbSet('__probe__', 1)
+    const val = await idbGet('__probe__')
+    await idbDelete('__probe__')
+    return val === 1
+  } catch {
+    return false
+  }
 }
 
 // ---------------------------------------------------------------------------
-// Migration from localStorage
+// Migration
 // ---------------------------------------------------------------------------
 
 async function migrateFromLocalStorage() {
@@ -165,24 +165,35 @@ async function migrateFromLocalStorage() {
     }
   }
 
+  console.log('[db] localStorage has', keys.length, 'chip_sales_ keys:', keys)
+
   if (keys.length === 0) {
     await idbSet(MIGRATED_KEY, true)
     return 0
   }
 
-  console.log(`[db] Migrating ${keys.length} keys from localStorage to IndexedDB...`)
-
+  let migrated = 0
   for (const key of keys) {
     const raw = localStorage.getItem(key)
     let value = raw
-    try { value = JSON.parse(raw) } catch { /* keep as string */ }
+    try { value = JSON.parse(raw) } catch {}
     cache.set(key, value)
-    await idbSet(key, value)
+    try {
+      await idbSet(key, value)
+      migrated++
+    } catch (e) {
+      console.error('[db] migrate failed for', key, ':', e)
+    }
   }
 
-  await idbSet(MIGRATED_KEY, true)
-  console.log('[db] Migration complete:', keys.length, 'keys')
-  return keys.length
+  try {
+    await idbSet(MIGRATED_KEY, true)
+  } catch (e) {
+    console.error('[db] failed to set sentinel:', e)
+  }
+
+  console.log('[db] migration done:', migrated, '/', keys.length, 'keys')
+  return migrated
 }
 
 // ---------------------------------------------------------------------------
@@ -193,6 +204,7 @@ export async function initStorage() {
   await openDB()
 
   if (fallbackToLocalStorage) {
+    console.log('[db] using localStorage fallback')
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i)
       if (key && key.startsWith('chip_sales_')) {
@@ -206,11 +218,18 @@ export async function initStorage() {
     return
   }
 
+  const writable = await probeIDB()
+  if (!writable) {
+    console.error('[db] IndexedDB not writable, switching to localStorage')
+    fallbackToLocalStorage = true
+    return initStorage()
+  }
+
   let allData
   try {
     allData = await idbGetAll()
   } catch (e) {
-    console.error('[db] Failed to read from IndexedDB, falling back:', e)
+    console.error('[db] idbGetAll failed:', e)
     fallbackToLocalStorage = true
     return initStorage()
   }
@@ -219,11 +238,17 @@ export async function initStorage() {
     cache.set(key, value)
   }
 
+  console.log('[db] cache has', cache.size, 'keys, has sentinel:', cache.has(MIGRATED_KEY))
+
   if (!cache.has(MIGRATED_KEY)) {
+    console.log('[db] no sentinel - running migration')
     await migrateFromLocalStorage()
   } else {
+    console.log('[db] sentinel found - skipping migration')
     cache.delete(MIGRATED_KEY)
   }
+
+  console.log('[db] init done. cache keys:', Array.from(cache.keys()))
 }
 
 export function storageGet(key, defaultValue = null) {
@@ -237,18 +262,23 @@ export function storageSet(key, value) {
   if (fallbackToLocalStorage) {
     try {
       localStorage.setItem(key, JSON.stringify(value))
+      console.log('[db] set via localStorage:', key, 'size:', JSON.stringify(value).length)
     } catch (e) {
-      console.error('[db] localStorage write failed:', e)
+      console.error('[db] localStorage write failed for', key, ':', e.message)
     }
     return
   }
 
-  idbSet(key, value).catch(err => {
+  idbSet(key, value).then(() => {
+    console.log('[db] set OK:', key)
+  }).catch(err => {
     console.error('[db] IndexedDB write failed for', key, ':', err)
     fallbackToLocalStorage = true
     try {
       localStorage.setItem(key, JSON.stringify(value))
-    } catch { /* last resort */ }
+    } catch (e2) {
+      console.error('[db] localStorage fallback also failed:', e2.message)
+    }
   })
 }
 
@@ -257,7 +287,7 @@ export function storageDelete(key) {
   if (fallbackToLocalStorage) {
     localStorage.removeItem(key)
   } else {
-    idbDelete(key).catch(err => console.error('[db] Delete failed:', err))
+    idbDelete(key).catch(err => console.error('[db] delete failed:', err))
   }
 }
 

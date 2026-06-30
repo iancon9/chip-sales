@@ -92,6 +92,8 @@ npm run preview
 
 ### GitHub Pages
 
+项目已配置 GitHub Actions 自动部署。推送 `main` 分支后自动构建并部署到 `gh-pages` 分支。
+
 在线地址：**https://iancon9.github.io/chip-sales/**
 
 ### 静态部署
@@ -108,6 +110,8 @@ chip-sales/
 ├── index.html              # 入口 HTML
 ├── vite.config.js          # Vite 配置（含 GitHub Pages base path）
 ├── package.json
+├── .github/workflows/      # GitHub Actions 自动部署
+│   └── deploy.yml
 ├── public/
 │   ├── favicon.svg
 │   ├── icons.svg

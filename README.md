@@ -29,7 +29,7 @@
 - 基于成本 + 定价系数自动计算建议价
 - 报价明细编辑（手动调整报价/数量/交期/备注）
 - **邮件模板生成**（HTML 格式表格，固定列宽，一键复制到剪贴板）
-- **PDF 导出**（jsPDF 生成正式报价单）
+- **PDF 导出**（jsPDF，后续实现）
 - 确认成交 → 自动计入当月提成统计
 
 ### 报价参数配置
@@ -58,19 +58,19 @@
 | UI | Element Plus |
 | 状态管理 | Pinia |
 | 路由 | Vue Router 4 (Hash 模式) |
-| 国际化 | vue-i18n (中文 / English) |
+| 国际化 | vue-i18n (中文 / English，基础配置) |
 | Excel 解析 | SheetJS (xlsx) |
 | PDF 导出 | jsPDF |
-| 图表 | Chart.js |
+
 | 图标 | @element-plus/icons-vue |
 | 邮件解析 | 自研规则引擎 + LLM 辅助 |
 
 ## 数据存储
 
-- 所有数据存储在浏览器 **localStorage** 中
+- 所有业务数据存储在浏览器 **IndexedDB** 中（不支持时自动降级到 localStorage）
 - 可在设置页 → 数据管理进行 JSON 备份/恢复
 - 每位销售人员浏览器独立存储，互不影响
-- 支持深色/浅色模式切换，跟随系统或手动选择
+- 深色/浅色模式基础设施已建立（CSS 变量），切换 UI 待实现
 
 ## 开发
 
@@ -92,11 +92,9 @@ npm run preview
 
 ### GitHub Pages
 
-项目已配置 GitHub Actions 自动部署。推送 `main` 分支后自动构建并部署到 `gh-pages` 分支。
-
 在线地址：**https://iancon9.github.io/chip-sales/**
 
-### 其他静态部署
+### 静态部署
 
 ```bash
 npm run build
@@ -110,8 +108,6 @@ chip-sales/
 ├── index.html              # 入口 HTML
 ├── vite.config.js          # Vite 配置（含 GitHub Pages base path）
 ├── package.json
-├── .github/workflows/      # GitHub Actions 自动部署
-│   └── deploy.yml
 ├── public/
 │   ├── favicon.svg
 │   ├── icons.svg
@@ -127,7 +123,7 @@ chip-sales/
     │   ├── quote.js        # 报价单 Store
     │   ├── customer.js     # 客户 Store
     │   ├── closedDeals.js  # 成交单 Store
-    │   └── dictionary.js   # 字典/配置 Store
+    │   └── dictionary.js   # 型号稀缺标记 Store
     ├── utils/              # 工具函数
     │   ├── commission.js   # 提成计算
     │   ├── emlParser.js    # EML 邮件解析

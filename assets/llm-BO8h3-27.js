@@ -1,0 +1,1 @@
+import{a as e,r as t}from"./index-CB9dt3Dp.js";function n(){return t(`chip_sales_llm_config`,{apiKey:``,endpoint:`https://api.openai.com/v1/chat/completions`,model:`gpt-3.5-turbo`})}function r(t){e(`chip_sales_llm_config`,t)}export{r as n,n as t};
